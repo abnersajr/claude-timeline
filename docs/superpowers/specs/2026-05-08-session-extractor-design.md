@@ -127,7 +127,44 @@ export interface ToolResultContent {
 }
 ```
 
-### 2.4 Tool Call (extracted from JSONL tool_use + tool_result pairs)
+### 2.4 Raw JSONL Record (before normalization)
+
+```typescript
+// Raw record from session.jsonl line — contains usage.cache_creation fields
+// This is the INTERNAL type used by jsonl-parser.ts, NOT exported to consumers
+interface RawJsonlRecord {
+  type: string;               // "assistant", "user", "system", etc.
+  timestamp?: string;           // Top-level timestamp
+  uuid?: string;               // Message UUID (for matching)
+  parentUuid?: string;         // Parent message UUID
+  message?: {
+    role: string;
+    content: any[];              // Raw content array (may include usage, etc.)
+    model?: string;              // Model used (e.g., "claude-sonnet-4-6")
+    usage?: {
+      input_tokens: number;
+      output_tokens: number;
+      cache_read_input_tokens: number;
+      cache_creation_input_tokens: number;
+      cache_creation?: {
+        ephemeral_5m_input_tokens: number;
+        ephemeral_1h_input_tokens: number;
+      };
+      // ... other usage fields
+    };
+  };
+  // For user messages with tool results:
+  toolUseResult?: {
+    toolUseId: string;
+    content: string;
+    isError?: boolean;
+  };
+}
+```
+
+**Normalized types (exported to consumers):**
+
+### 2.5 Tool Call (extracted from JSONL tool_use + tool_result pairs)
 
 ```typescript
 // Matches session-report.md Section 4.2 (Tool Used, Exact Command, Tool Result)
@@ -141,10 +178,14 @@ export interface ToolCall {
 }
 ```
 
-### 2.5 Session Metadata (from SQLite `sessions` table)
+### 2.5 Session Metadata (from SQLite `sessions` + `turns` tables)
 
 ```typescript
 // Matches session-report.md Section 4.1 (Session Overview table)
+// NOTE: model comes from turns table (sessions table does NOT have model column)
+// getSession() queries: 
+//   1. SELECT * FROM sessions WHERE session_id = ?
+//   2. SELECT model FROM turns WHERE session_id = ? LIMIT 1 (get model from first turn)
 export interface SessionMetadata {
   sessionId: string;            // From sessions.session_id
   projectName: string;           // From sessions.project_name
@@ -268,15 +309,27 @@ merger.extractFullTimeline(sessionId, dbPath, projectsDir)
 2. Get turns from dbReader.getTurns()
 3. Get projectName from session, construct JSONL path
 4. Parse JSONL: jsonlParser.parseSessionJsonl(jsonlPath, sessionId)
-5. For each Turn from SQLite:
-   a. Find matching messages in JSONL (by timestamp proximity or UUID)
-   b. Find tool calls that belong to this turn
-   c. Extract cache creation breakdown from JSONL usage object
-   d. Infer cacheReadType (see Section 2 assumption notes)
-   e. Attach messages + toolCalls to the Turn object
+   - Returns: { rawMessages: RawJsonlRecord[], toolCalls: ToolCall[] }
+5. For each Turn from SQLite (index i):
+   a. MATCHING ALGORITHM (deterministic):
+      - Primary: Find RawJsonlRecord with timestamp within 5 seconds of turn.timestamp
+      - Secondary: If multiple matches, use the one with matching uuid (if turn has uuid)
+      - Fallback: Use the i-th assistant message in JSONL (assumes ordered)
+   b. Normalize RawJsonlRecord → Message (extract content array, handle usage field)
+   c. Find tool calls that belong to this turn (by timestamp proximity)
+   d. Extract cache creation breakdown from RawJsonlRecord.usage.cache_creation
+   e. Infer cacheReadType (see Section 2 assumption notes)
+   f. Attach messages + toolCalls to the Turn object
 6. Calculate pricing: pricing.calculateSessionCost(session, turns)
 7. Return: FullTimelineSession
 ```
+
+**Turn Matching Rules (deterministic):**
+- Each SQLite turn has a `timestamp` (from turns table)
+- Each JSONL assistant message has a `timestamp` (top-level field)
+- Match if: `abs(turn.timestamp - jsonlMsg.timestamp) < 5 seconds`
+- If multiple JSONL messages match, pick the one with matching `uuid` (if turn has uuid)
+- If no match by timestamp, use index-based: turn[i] → jsonlMessages[i] (assumes both are ordered by time)
 
 ### Step 5: Pricing Calculation (`src/pricing.ts`)
 
@@ -351,18 +404,38 @@ FullTimelineSession (from merger)
 ```typescript
 // src/db-reader.ts
 function getSession(dbPath: string, sessionId: string): SessionMetadata {
-  const db = openDb(dbPath);
-  const row = db.prepare('SELECT * FROM sessions WHERE session_id = ?').get(sessionId);
-  
-  if (!row) {
-    // THROW with clear error — this is a hard failure
+  let db: Database;
+  try {
+    db = openDb(dbPath);
+  } catch (err) {
+    // Handle DB open failures (file not found, permission errors, corrupt DB)
     throw new Error(
-      `Session not found: ${sessionId}\n` +
-      `  DB: ${dbPath}\n` +
-      `  Tip: Use 'sqlite3 ${dbPath} "SELECT session_id FROM sessions LIMIT 5;"' to list available sessions`
+      `Failed to open SQLite DB: ${dbPath}\n` +
+      `  Error: ${err.message}\n` +
+      `  Tip: Check file permissions and ensure the path points to a valid SQLite database`
     );
   }
-  return mapRowToSessionMetadata(row);
+
+  try {
+    const row = db.prepare('SELECT * FROM sessions WHERE session_id = ?').get(sessionId);
+  
+    if (!row) {
+      // THROW with clear error — this is a hard failure
+      throw new Error(
+        `Session not found: ${sessionId}\n` +
+        `  DB: ${dbPath}\n` +
+        `  Tip: Use 'sqlite3 ${dbPath} "SELECT session_id FROM sessions LIMIT 5;"' to list available sessions`
+      );
+    }
+    return mapRowToSessionMetadata(row);
+  } catch (err) {
+    // Handle query failures
+    throw new Error(
+      `Failed to query session: ${err.message}\n` +
+      `  DB: ${dbPath}\n` +
+      `  Session ID: ${sessionId}`
+    );
+  }
 }
 ```
 
@@ -370,15 +443,26 @@ function getSession(dbPath: string, sessionId: string): SessionMetadata {
 
 ```typescript
 // src/merger.ts
-function findJsonlPath(projectsDir: string, projectName: string, sessionId: string): string {
-  // Project name is URL-encoded in the path (e.g., "/" → "-")
-  const encodedProject = projectName.replace(/\//g, '-');  // Simplified — real encoding may differ
+// Returns null if file not found — caller must handle null case
+function findJsonlPath(projectsDir: string, projectName: string, sessionId: string): string | null {
+  // Project name encoding: Replace "/" with "-" (matches Claude Code's encoding)
+  // Example: "/Users/abnersoaresalvesjunior" → "-Users-abnersoaresalvesjunior"
+  // Note: This is a simplified encoding. If JSONL file not found, try:
+  // 1. URL-encoded version: encodeURIComponent(projectName)
+  // 2. Base64 encoded version (if Claude Code uses that)
+  const encodedProject = projectName.replace(/\//g, '-');
   const jsonlPath = path.join(projectsDir, encodedProject, `${sessionId}.jsonl`);
   
   if (!fs.existsSync(jsonlPath)) {
+    // Try URL-encoded version as fallback
+    const urlEncoded = encodeURIComponent(projectName);
+    const urlPath = path.join(projectsDir, urlEncoded, `${sessionId}.jsonl`);
+    if (fs.existsSync(urlPath)) return urlPath;
+    
     // WARN, not throw — we can still return SQLite data without JSONL
     console.warn(
       `⚠️  JSONL file not found: ${jsonlPath}\n` +
+      `   Also tried: ${urlPath}\n` +
       `   Session will have empty messages/toolCalls.\n` +
       `   Tip: Check project_name encoding in SQLite vs actual directory name.`
     );
@@ -472,6 +556,9 @@ function getPricing(modelName: string): PricingRate {
 
 ```typescript
 // src/merger.ts
+// NOTE: cacheReadType is for UI display ONLY.
+// Pricing is the SAME for both tiers (cacheReadPerMTok = 0.1x input, regardless of 5m vs 1h).
+// This inference is NOT definitive — see CONTRIBUTING.md > Key Assumptions.
 function inferCacheReadType(
   turnIndex: number,
   turns: Turn[],
@@ -482,7 +569,9 @@ function inferCacheReadType(
     if (isNaN(currentTime)) throw new Error('Invalid timestamp');
     
     const prevTurn = turns[turnIndex - 1];
-    if (!prevTurn) return 'unknown';
+    // NOTE: 'unknown' is only for actual errors, NOT for "could not determine" cases.
+    // Default is '5m' (most sessions use 5m TTL).
+    if (!prevTurn) return '5m'; // No previous turn — assume 5m default
     
     const prevTime = new Date(prevTurn.timestamp).getTime();
     if (isNaN(prevTime)) throw new Error('Invalid previous timestamp');
@@ -492,15 +581,15 @@ function inferCacheReadType(
     if (prevTurn.cacheWriteType === '1h' && timeDiff < 60 * 60 * 1000) return '1h';
     if (prevTurn.cacheWriteType === '5m' && timeDiff < 5 * 60 * 1000) return '5m';
     
-    return '5m'; // Default assumption
+    return '5m'; // Default assumption (matches Anthropic's default TTL)
   } catch (err) {
     console.warn(`⚠️  Could not infer cache read type: ${err.message}`);
-    return 'unknown';
+    return 'unknown'; // Only on actual parse errors
   }
 }
 ```
 
-### 4.7 CLI Argument Validation
+### 4.7 CLI Argument Validation & Output Handling
 
 ```typescript
 // src/index.ts
@@ -525,6 +614,26 @@ function parseArgs(argv: string[]): Config {
     projectsDir: args['projects-dir'] || process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude', 'projects'),
     outputPath: args['output'] || null,
   };
+}
+
+// Output JSON (handles both stdout and file output)
+function outputJSON(data: FullTimelineSession, outputPath: string | null): void {
+  const json = JSON.stringify(data, null, 2);
+  
+  if (outputPath) {
+    try {
+      fs.writeFileSync(outputPath, json, 'utf-8');
+      console.log(`✅ Output written to: ${outputPath}`);
+    } catch (err) {
+      console.error(`❌ Failed to write output file: ${outputPath}`);
+      console.error(`   Error: ${err.message}`);
+      console.error(`   Tip: Check file permissions and disk space.`);
+      // Fallback to stdout
+      console.log(json);
+    }
+  } else {
+    console.log(json);
+  }
 }
 ```
 
