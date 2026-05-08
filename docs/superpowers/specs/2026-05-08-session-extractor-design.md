@@ -38,12 +38,13 @@ timeline/
 ```
 
 ### Key Design Decisions:
-1. **`types.ts`** defines core interfaces: `Session`, `Turn`, `ToolCall`, `Message`, `PricingRate` — matching the schemas from `session-report.md`
+1. **`types.ts`** defines core interfaces: `Session`, `Turn`, `ToolCall`, `Message`, `PricingRate`, `RawJsonlRecord` — matching the schemas from `session-report.md`
 2. **`db-reader.ts`** exports: `getSession(dbPath, sessionId) → Session`, `getTurns(dbPath, sessionId) → Turn[]`
-3. **`jsonl-parser.ts`** exports: `parseSessionJsonl(jsonlPath, sessionId) → { messages: Message[], toolCalls: ToolCall[] }`
-4. **`merger.ts`** exports: `mergeSessionData(session, turns, jsonlData) → FullTimelineSession`
+3. **`jsonl-parser.ts`** exports: `parseSessionJsonl(jsonlPath, sessionId) → { rawMessages: RawJsonlRecord[], toolCalls: ToolCall[] }` (returns raw records, merger handles normalization)
+4. **`merger.ts`** exports: `mergeSessionData(session, turns, rawMessages, toolCalls) → FullTimelineSession`
 5. **`pricing.ts`** exports: `getPricing(modelName) → PricingRate`, `calculateCost(turn, pricing) → TurnCost`
-6. **`index.ts`** handles: CLI arg parsing (for standalone use), path resolution, orchestration, JSON output
+6. **`index.ts`** handles: CLI arg parsing (for standalone use), path resolution (via `utils.ts`), orchestration, JSON output
+7. **`utils.ts`** handles: Path resolution (`getDbPath()`, `getProjectsDir()`), project name encoding
 
 ### Scalability Note (for future multi-session support):
 - `db-reader.ts` can add `getAllSessions(dbPath) → Session[]`
