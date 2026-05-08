@@ -112,10 +112,14 @@ function resolveSessionJsonlPath(
 // Pricing uses cacheReadPerMTok (same rate for both tiers).
 // This algorithm is NOT definitive — see CONTRIBUTING.md > Key Assumptions.
 
+// Ownership: cacheWriteType is SET by jsonl-parser.ts during normalization
+// (extracted from RawJsonlRecord.message.usage.cache_creation).
+// merger.ts only READS cacheWriteType to infer cacheReadType.
+
 function inferCacheReadType(
   turnIndex: number,
   turns: Turn[],
-  currentTurnTime: string
+  currentTime: string
 ): '5m' | '1h' | '5m-fallback' | 'unknown' {
   try {
     const currentTime = new Date(currentTurnTime).getTime();
@@ -145,6 +149,29 @@ function inferCacheReadType(
 }
 ```
 
+### 2.4.2 JSONL Parser Error Taxonomy
+```typescript
+// jsonl-parser.ts error handling:
+// - File not found → returns null (caller handles)
+// - Critical I/O errors (EISDIR, EACCES) → throws with code/message
+// - Malformed lines → skip, increment malformedCount, continue
+
+class JsonlParseError extends Error {
+  code = 'JSONL_PARSE_ERROR';
+  constructor(message: string) { super(message); }
+}
+
+// Example: Critical I/O failure
+try {
+  fs.readFileSync(jsonlPath, 'utf-8');
+} catch (err) {
+  if (err.code === 'EISDIR' || err.code === 'EACCES') {
+    throw new JsonlParseError(`Critical I/O error: ${err.message}`);
+  }
+  // Non-critical errors: handle upstream
+}
+```
+
 ### 2.5 `pricing.ts`
 ```typescript
 // Returns fallback (Sonnet 4.6) for unknown models (logs warning)
@@ -155,14 +182,14 @@ function calculateSessionCost(session: SessionMetadata, turns: Turn[]): SessionP
 
 ### 2.6 `index.ts`
 ```typescript
-// Exit codes: 0=success, 1=usage error, 2=DB error, 3=permissions
+// Exit codes: 0=success (may have warnings), 1=usage error, 2=session not found, 3=DB open failure
 function parseArgs(argv: string[]): Config | never
 function outputJSON(data: FullTimelineSession, outputPath: string | null): void
 ```
 
 ### 2.7 `utils.ts`
 ```typescript
-// CLaude_CONFIG_DIR env var support:
+// CLAUDE_CONFIG_DIR env var support:
 // - If set: dbPath = `${CLAUDE_CONFIG_DIR}/usage.db`
 // - If set: projectsDir = `${CLAUDE_CONFIG_DIR}/projects`
 // - Default: ~/.claude/usage.db and ~/.claude/projects
@@ -182,7 +209,7 @@ function encodeProjectName(projectName: string): string
 | Turn ordering | SQLite turns ORDER BY timestamp ASC |
 | Message matching | Primary: ±5s timestamp window; Secondary: uuid match; Fallback: index-based |
 | Unmatched turns | Keep turn with empty messages, log warning |
-| Unmatched messages | Attach to nearest turn by timestamp, log warning |
+| Unmatched messages | Attach to turn[i] if index-based, or nearest timestamp if multiple matches, log warning |
 | Token counts | SQLite is authoritative (billed amounts) |
 | Cache creation breakdown | JSONL is authoritative (has 5m/1h breakdown) |
 | Cache read type | Inferred from previous turn (UI-only, not for billing) |
