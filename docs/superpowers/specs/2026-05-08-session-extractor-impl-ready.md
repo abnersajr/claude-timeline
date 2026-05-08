@@ -68,23 +68,47 @@ function parseSessionJsonl(jsonlPath: string | null, sessionId: string): {
 } | null
 ```
 
-### 2.4 `merger.ts`
+### 2.4 `merger.ts` (Orchestrator + Helpers)
+
 ```typescript
-// Main orchestrator
+// Main orchestrator (delegates to helpers)
 function extractFullTimeline(
   sessionId: string,
   dbPath: string,
   projectsDir: string
 ): FullTimelineSession {
-  // 1. Get session + turns from SQLite
-  // 2. Find JSONL path via resolveSessionJsonlPath() (handle null)
-  // 3. Parse JSONL (handle null → empty messages)
-  // 4. Match turns ↔ rawMessages (deterministic algorithm)
-  // 5. Normalize RawJsonlRecord → Message
-  // 6. Infer cacheReadType per turn
-  // 7. Calculate pricing
+  // 1. Get session + turns from SQLite (db-reader.ts)
+  // 2. Find JSONL path via resolveSessionJsonlPath() (utils.ts, handle null)
+  // 3. Parse JSONL (jsonl-parser.ts, handle null → empty messages)
+  // 4. Match turns ↔ rawMessages (matcher.ts helper)
+  // 5. Normalize RawJsonlRecord → Message (normalizer.ts helper)
+  // 6. Infer cacheReadType per turn (cache-inference.ts helper)
+  // 7. Calculate pricing (pricing.ts)
   // 8. Return FullTimelineSession
 }
+
+// Helper: Turn ↔ Message Matcher (internal to merger.ts)
+// Exported for testing only
+export function matchTurnsToMessages(
+  turns: Turn[],
+  rawMessages: RawJsonlRecord[]
+): { matchedTurns: Turn[]; unmatchedTurns: number; unmatchedMessages: number } {
+  // Deterministic algorithm (see §2.4)
+}
+
+// Helper: Normalizer (internal to merger.ts)
+// Exported for testing only
+export function normalizeRawMessage(raw: RawJsonlRecord): Message {
+  // Extract Message from RawJsonlRecord
+  // Set Message.cacheWriteType from raw.message?.usage?.cache_creation
+}
+
+// Helper: Cache Inference (internal to merger.ts)
+// Exported for testing only
+export function inferCacheReadType(/*...*/): '5m' | '1h' | '5m-fallback' | 'unknown' {
+  // See §2.4.1
+}
+```
 
 // JSONL path resolution (explicit contract):
 // Returns null if not found (caller handles)
@@ -112,18 +136,20 @@ function resolveSessionJsonlPath(
 // Pricing uses cacheReadPerMTok (same rate for both tiers).
 // This algorithm is NOT definitive — see CONTRIBUTING.md > Key Assumptions.
 
-// Ownership: cacheWriteType is SET by jsonl-parser.ts during normalization
-// (extracted from RawJsonlRecord.message.usage.cache_creation).
-// merger.ts only READS cacheWriteType to infer cacheReadType.
+// Ownership (canonical):
+// - jsonl-parser.ts: Sets Turn.cacheWriteType during normalization
+//   (extracts from RawJsonlRecord.message.usage.cache_creation)
+// - merger.ts: Only READS cacheWriteType to infer cacheReadType
+// - merger.ts: Sets Turn.cacheReadType using inferCacheReadType()
 
 function inferCacheReadType(
   turnIndex: number,
   turns: Turn[],
-  currentTime: string
+  currentTurnTime: string
 ): '5m' | '1h' | '5m-fallback' | 'unknown' {
   try {
-    const currentTime = new Date(currentTurnTime).getTime();
-    if (isNaN(currentTime)) return 'unknown';
+    const time = new Date(currentTurnTime).getTime();
+    if (isNaN(time)) return 'unknown';
     
     const prevTurn = turns[turnIndex - 1];
     if (!prevTurn) return '5m-fallback'; // No previous turn → assume 5m default
@@ -131,7 +157,7 @@ function inferCacheReadType(
     const prevTime = new Date(prevTurn.timestamp).getTime();
     if (isNaN(prevTime)) return 'unknown';
     
-    const timeDiff = currentTime - prevTime;
+    const timeDiff = time - prevTime;
     
     // If previous turn wrote to 1h cache, check if within 1 hour
     if (prevTurn.cacheWriteType === '1h' && timeDiff < 60 * 60 * 1000) {
@@ -149,11 +175,23 @@ function inferCacheReadType(
 }
 ```
 
-### 2.4.2 JSONL Parser Error Taxonomy
+### 2.4.2 Normalization Ownership (Canonical Statement)
+```typescript
+// Single source of truth for normalization:
+// 1. jsonl-parser.ts: parseSessionJsonl() returns { rawMessages: RawJsonlRecord[] }
+// 2. merger.ts: normalizeRawMessage(raw: RawJsonlRecord): Message
+//    - Extracts Message from RawJsonlRecord
+//    - Sets Message.cacheWriteType from raw.message.usage.cache_creation
+// 3. merger.ts: matchTurnsToMessages() calls normalizeRawMessage()
+//    - Attaches normalized Message to Turn
+// 4. jsonl-parser.ts does NOT export RawJsonlRecord (internal only)
+```
+
+### 2.4.3 JSONL Parser Error Taxonomy
 ```typescript
 // jsonl-parser.ts error handling:
-// - File not found → returns null (caller handles)
-// - Critical I/O errors (EISDIR, EACCES) → throws with code/message
+// - File not found (ENOENT) → returns null (caller handles)
+// - Critical I/O errors (EISDIR, EACCES, EMFILE) → throws JsonlParseError
 // - Malformed lines → skip, increment malformedCount, continue
 
 class JsonlParseError extends Error {
@@ -161,14 +199,25 @@ class JsonlParseError extends Error {
   constructor(message: string) { super(message); }
 }
 
+// Error mapping table:
+// | Error Code | Severity | Action |
+// |------------|----------|--------|
+// | ENOENT     | Warning  | Return null (caller handles) |
+// | EISDIR     | Fatal    | Throw JsonlParseError (exit code 3) |
+// | EACCES     | Fatal    | Throw JsonlParseError (exit code 3) |
+// | EMFILE     | Fatal    | Throw JsonlParseError (exit code 3) |
+// | Other      | Warning  | Log, continue (non-critical) |
+
 // Example: Critical I/O failure
 try {
   fs.readFileSync(jsonlPath, 'utf-8');
 } catch (err) {
-  if (err.code === 'EISDIR' || err.code === 'EACCES') {
+  if (['EISDIR', 'EACCES', 'EMFILE'].includes(err.code)) {
     throw new JsonlParseError(`Critical I/O error: ${err.message}`);
   }
-  // Non-critical errors: handle upstream
+  if (err.code === 'ENOENT') return null; // Caller handles
+  // Other errors: log warning, continue
+  console.warn(`⚠️  Non-critical I/O error: ${err.message}`);
 }
 ```
 
@@ -207,9 +256,9 @@ function encodeProjectName(projectName: string): string
 | Rule | Behavior |
 |------|----------|
 | Turn ordering | SQLite turns ORDER BY timestamp ASC |
-| Message matching | Primary: ±5s timestamp window; Secondary: uuid match; Fallback: index-based |
-| Unmatched turns | Keep turn with empty messages, log warning |
-| Unmatched messages | Attach to turn[i] if index-based, or nearest timestamp if multiple matches, log warning |
+| Message matching (canonical - §2.4) | Primary: ±5s timestamp window; If multiple: use uuid match; If no uuid: use FIRST match; Fallback: turn[i] → rawMessages[i] |
+| Unmatched turns | Keep turn with empty messages, log warning with count |
+| Unmatched messages | If index-based: attach to turn[i]; If timestamp match: attach to nearest turn; log warning with count |
 | Token counts | SQLite is authoritative (billed amounts) |
 | Cache creation breakdown | JSONL is authoritative (has 5m/1h breakdown) |
 | Cache read type | Inferred from previous turn (UI-only, not for billing) |
