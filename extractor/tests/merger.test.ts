@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import { extractFullTimeline, inferCacheReadType, matchTurnsToMessages } from "../src/merger"
+import { extractCommandExecuted, extractFullTimeline, inferCacheReadType, matchTurnsToMessages } from "../src/merger"
 import type { RawJsonlRecord, SessionMetadata, Turn } from "../src/types"
 
 // Mock db-reader (other agent is building this)
@@ -143,6 +143,41 @@ describe("merger", () => {
       ] as any[]
       const result = inferCacheReadType(1, turns, turns[1].timestamp)
       expect(result).toBe("5m")
+    })
+  })
+
+  describe("extractCommandExecuted", () => {
+    it("should extract command from first user message with command-name tag", () => {
+      const messages: RawJsonlRecord[] = [
+        {
+          type: "user",
+          uuid: "1",
+          timestamp: "2026-05-07T19:22:39.000Z",
+          message: {
+            role: "user",
+            content: "<command-message>claude-hud:setup</command-message>\n<command-name>/claude-hud:setup</command-name>",
+          },
+        },
+      ]
+      const result = extractCommandExecuted(messages)
+      expect(result).toBe("/claude-hud:setup")
+    })
+
+    it("should return undefined for sessions without command", () => {
+      const messages: RawJsonlRecord[] = [
+        {
+          type: "user",
+          uuid: "1",
+          timestamp: "2026-05-07T19:22:39.000Z",
+          message: { role: "user", content: "Fix the bug in auth.ts" },
+        },
+      ]
+      const result = extractCommandExecuted(messages)
+      expect(result).toBeUndefined()
+    })
+
+    it("should return undefined for empty messages", () => {
+      expect(extractCommandExecuted([])).toBeUndefined()
     })
   })
 

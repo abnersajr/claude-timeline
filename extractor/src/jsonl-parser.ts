@@ -26,6 +26,9 @@ export function parseSessionJsonl(
   const toolCalls: ToolCall[] = []
   let malformedCount = 0
 
+  // Map: assistant uuid → indices into toolCalls array
+  const assistantToolCallIndices = new Map<string, number[]>()
+
   for (const line of lines) {
     let entry: Record<string, unknown>
     try {
@@ -42,25 +45,48 @@ export function parseSessionJsonl(
     rawMessages.push(record)
 
     // Extract tool calls from assistant messages
-    if (record.type === "assistant" && record.message?.content) {
+    if (record.type === "assistant" && record.message?.content && Array.isArray(record.message.content)) {
+      const indices: number[] = []
       for (const block of record.message.content) {
         if (block.type === "tool_use") {
+          const idx = toolCalls.length
           toolCalls.push({
-            toolUseId: block.toolUseId as string,
+            toolUseId: (block.id ?? block.toolUseId) as string,
             name: block.name as string,
             input: block.input as Record<string, unknown>,
             timestamp: record.timestamp,
           })
+          indices.push(idx)
         }
+      }
+      if (indices.length > 0 && record.uuid) {
+        assistantToolCallIndices.set(record.uuid, indices)
       }
     }
 
-    // Match toolUseResult to existing toolCall
-    if (record.toolUseResult) {
-      const existing = toolCalls.find((tc) => tc.toolUseId === record.toolUseResult?.toolUseId)
-      if (existing) {
-        existing.result = String(record.toolUseResult.content)
-        existing.isError = record.toolUseResult.isError
+    // Match toolUseResult to tool calls via parentUuid → uuid relationship
+    if (record.toolUseResult && record.parentUuid) {
+      const indices = assistantToolCallIndices.get(record.parentUuid)
+      if (indices) {
+        const result = record.toolUseResult as Record<string, unknown>
+        // Extract meaningful result content
+        let resultStr: string
+        if (result.stdout !== undefined) {
+          resultStr = String(result.stdout)
+          if (result.stderr) resultStr += `\n[stderr]: ${result.stderr}`
+        } else if (result.questions !== undefined) {
+          resultStr = JSON.stringify({ questions: result.questions, answers: result.answers })
+        } else {
+          resultStr = JSON.stringify(result)
+        }
+
+        const isError = Boolean(result.interrupted) || Boolean(result.stderr)
+
+        // Attach result to all tool calls from the parent assistant message
+        for (const idx of indices) {
+          toolCalls[idx].result = resultStr
+          toolCalls[idx].isError = isError
+        }
       }
     }
   }

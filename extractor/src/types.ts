@@ -17,7 +17,7 @@ export interface RawJsonlRecord {
   parentUuid?: string
   message?: {
     role: string
-    content: Array<Record<string, unknown>>
+    content: Array<Record<string, unknown>> | string
     model?: string
     usage?: TokenUsage
   }
