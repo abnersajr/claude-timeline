@@ -44,6 +44,13 @@ export function parseSessionJsonl(
     const record = entry as unknown as RawJsonlRecord
     rawMessages.push(record)
 
+    // Normalize cache creation breakdown from JSONL
+    if (record.message?.usage?.cache_creation) {
+      const cc = record.message.usage.cache_creation
+      record.message.usage.cacheCreation5mTokens = cc.ephemeral_5m_input_tokens ?? 0
+      record.message.usage.cacheCreation1hTokens = cc.ephemeral_1h_input_tokens ?? 0
+    }
+
     // Extract tool calls from assistant messages
     if (record.type === "assistant" && record.message?.content && Array.isArray(record.message.content)) {
       const indices: number[] = []

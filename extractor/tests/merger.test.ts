@@ -123,6 +123,79 @@ describe("merger", () => {
       expect(result[0].messages.length).toBe(0)
       expect(result[1].messages.length).toBe(0)
     })
+
+    it("should prefer JSONL cache breakdown over DB total", () => {
+      const dbTurns: Turn[] = [{
+        timestamp: "2026-05-07T19:22:45.118Z",
+        tokenUsage: {
+          inputTokens: 2,
+          outputTokens: 323,
+          cacheReadTokens: 12143,
+          cacheCreation5mTokens: 12973, // DB has total, no split
+          cacheCreation1hTokens: 0,
+        },
+        messages: [],
+        toolCalls: [],
+        cacheWriteType: "5m",
+        cacheReadType: "5m",
+        cacheCreationTokensThisTurn: 12973,
+      }]
+
+      const jsonlMessages: RawJsonlRecord[] = [{
+        type: "assistant",
+        uuid: "1",
+        timestamp: "2026-05-07T19:22:45.118Z",
+        message: {
+          role: "assistant",
+          content: [{ type: "text", text: "Hello" }],
+          usage: {
+            cache_creation: {
+              ephemeral_5m_input_tokens: 0,
+              ephemeral_1h_input_tokens: 12973,
+            },
+            cacheCreation5mTokens: 0,
+            cacheCreation1hTokens: 12973,
+          },
+        },
+      }]
+
+      const result = matchTurnsToMessages(dbTurns, jsonlMessages)
+      expect(result[0].tokenUsage.cacheCreation5mTokens).toBe(0)
+      expect(result[0].tokenUsage.cacheCreation1hTokens).toBe(12973)
+    })
+
+    it("should fall back to DB values when JSONL has no cache breakdown", () => {
+      const dbTurns: Turn[] = [{
+        timestamp: "2026-05-07T19:22:45.118Z",
+        tokenUsage: {
+          inputTokens: 2,
+          outputTokens: 323,
+          cacheReadTokens: 12143,
+          cacheCreation5mTokens: 5000,
+          cacheCreation1hTokens: 0,
+        },
+        messages: [],
+        toolCalls: [],
+        cacheWriteType: "5m",
+        cacheReadType: "5m",
+        cacheCreationTokensThisTurn: 5000,
+      }]
+
+      const jsonlMessages: RawJsonlRecord[] = [{
+        type: "assistant",
+        uuid: "1",
+        timestamp: "2026-05-07T19:22:45.118Z",
+        message: {
+          role: "assistant",
+          content: [{ type: "text", text: "Hello" }],
+          // No usage.cache_creation in JSONL
+        },
+      }]
+
+      const result = matchTurnsToMessages(dbTurns, jsonlMessages)
+      expect(result[0].tokenUsage.cacheCreation5mTokens).toBe(5000)
+      expect(result[0].tokenUsage.cacheCreation1hTokens).toBe(0)
+    })
   })
 
   describe("inferCacheReadType", () => {

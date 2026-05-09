@@ -80,7 +80,21 @@ export function matchTurnsToMessages(
       content: normalizeContent(m.message?.content ?? []),
     }))
 
-    return { ...turn, messages: normalizedMessages, toolCalls: matchedToolCalls }
+    // Apply JSONL cache breakdown if available (preferred over DB total)
+    let mergedTokenUsage = turn.tokenUsage
+    for (const msg of matchedMessages) {
+      const usage = msg.message?.usage
+      if (usage?.cacheCreation5mTokens !== undefined || usage?.cacheCreation1hTokens !== undefined) {
+        mergedTokenUsage = {
+          ...turn.tokenUsage,
+          cacheCreation5mTokens: usage.cacheCreation5mTokens ?? turn.tokenUsage.cacheCreation5mTokens,
+          cacheCreation1hTokens: usage.cacheCreation1hTokens ?? turn.tokenUsage.cacheCreation1hTokens,
+        }
+        break
+      }
+    }
+
+    return { ...turn, messages: normalizedMessages, toolCalls: matchedToolCalls, tokenUsage: mergedTokenUsage }
   })
 
   return matched

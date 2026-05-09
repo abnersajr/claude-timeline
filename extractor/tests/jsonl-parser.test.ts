@@ -70,32 +70,33 @@ describe("jsonl-parser", () => {
     expect(result?.toolCalls[0].input).toEqual({ command: "ls" })
   })
 
-  it("should match toolUseResult to existing toolCall", () => {
+  it("should match toolUseResult to existing toolCall via parentUuid", () => {
     const content = [
       JSON.stringify({
         type: "assistant",
-        uuid: "1",
+        uuid: "assistant-1",
         timestamp: "2026-05-07T19:22:45.118Z",
         message: {
           role: "assistant",
           content: [
             {
               type: "tool_use",
+              id: "tool-1",
               name: "Bash",
               input: { command: "ls" },
-              toolUseId: "tool-1",
             },
           ],
         },
       }),
       JSON.stringify({
         type: "user",
-        uuid: "2",
+        uuid: "user-1",
+        parentUuid: "assistant-1",
         timestamp: "2026-05-07T19:22:46.118Z",
         toolUseResult: {
-          toolUseId: "tool-1",
-          content: "file.txt",
-          isError: false,
+          stdout: "file.txt",
+          stderr: "",
+          interrupted: false,
         },
         message: { role: "user", content: [] },
       }),
@@ -155,26 +156,27 @@ describe("jsonl-parser", () => {
     const content = [
       JSON.stringify({
         type: "assistant",
-        uuid: "1",
+        uuid: "assistant-2",
         message: {
           role: "assistant",
           content: [
             {
               type: "tool_use",
+              id: "tool-2",
               name: "Bash",
               input: { command: "bad" },
-              toolUseId: "tool-1",
             },
           ],
         },
       }),
       JSON.stringify({
         type: "user",
-        uuid: "2",
+        uuid: "user-2",
+        parentUuid: "assistant-2",
         toolUseResult: {
-          toolUseId: "tool-1",
-          content: "command not found",
-          isError: true,
+          stdout: "",
+          stderr: "command not found",
+          interrupted: true,
         },
         message: { role: "user", content: [] },
       }),
@@ -183,7 +185,59 @@ describe("jsonl-parser", () => {
 
     const result = parseSessionJsonl(jsonlPath, "session-1")
     expect(result).not.toBeNull()
-    expect(result?.toolCalls[0].result).toBe("command not found")
+    expect(result?.toolCalls[0].result).toContain("command not found")
     expect(result?.toolCalls[0].isError).toBe(true)
+  })
+
+  it("should extract cache_creation 5m/1h breakdown from message.usage", () => {
+    const content = JSON.stringify({
+      type: "assistant",
+      uuid: "1",
+      timestamp: "2026-05-07T19:22:45.118Z",
+      message: {
+        role: "assistant",
+        content: [{ type: "text", text: "Hello" }],
+        usage: {
+          input_tokens: 2,
+          output_tokens: 323,
+          cache_read_input_tokens: 12143,
+          cache_creation_input_tokens: 12973,
+          cache_creation: {
+            ephemeral_5m_input_tokens: 0,
+            ephemeral_1h_input_tokens: 12973,
+          },
+        },
+      },
+    })
+    fs.writeFileSync(jsonlPath, content)
+
+    const result = parseSessionJsonl(jsonlPath, "session-1")
+    expect(result).not.toBeNull()
+    expect(result?.rawMessages[0].message?.usage?.cacheCreation5mTokens).toBe(0)
+    expect(result?.rawMessages[0].message?.usage?.cacheCreation1hTokens).toBe(12973)
+  })
+
+  it("should handle cache_creation with only 5m tokens", () => {
+    const content = JSON.stringify({
+      type: "assistant",
+      uuid: "1",
+      timestamp: "2026-05-07T19:22:45.118Z",
+      message: {
+        role: "assistant",
+        content: [{ type: "text", text: "Hello" }],
+        usage: {
+          cache_creation: {
+            ephemeral_5m_input_tokens: 5000,
+            ephemeral_1h_input_tokens: 0,
+          },
+        },
+      },
+    })
+    fs.writeFileSync(jsonlPath, content)
+
+    const result = parseSessionJsonl(jsonlPath, "session-1")
+    expect(result).not.toBeNull()
+    expect(result?.rawMessages[0].message?.usage?.cacheCreation5mTokens).toBe(5000)
+    expect(result?.rawMessages[0].message?.usage?.cacheCreation1hTokens).toBe(0)
   })
 })
