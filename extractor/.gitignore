@@ -10,6 +10,7 @@ skills-lock.json
 dist/
 build/
 *.tsbuildinfo
+*.tgz
 
 # Environment
 .env

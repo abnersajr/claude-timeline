@@ -10,17 +10,22 @@
   },
   "scripts": {
     "extract": "tsx src/index.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "lint": "@biomejs/biome check .",
+    "format": "@biomejs/biome format ."
   },
   "dependencies": {
     "better-sqlite3": "^11.7.0",
     "minimist": "^1.2.8"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.4.14",
     "@types/better-sqlite3": "^7.6.12",
     "@types/minimist": "^1.2.5",
     "@types/node": "^22.10.5",
     "tsx": "^4.19.2",
-    "typescript": "^5.7.3"
+    "typescript": "^5.7.3",
+    "vitest": "^3.1.1"
   }
 }
