@@ -32,19 +32,34 @@ export function encodeProjectName(projectName: string): string {
 
 /**
  * Resolve the path to a session's JSONL file
- * Tries encoded project name first, then URL-encoded fallback
+ * Tries multiple encodings to handle DB storing project_name with or without leading '/'
  */
 export function resolveSessionJsonlPath(
   session: { projectName: string; sessionId: string },
   projectsDir: string,
 ): string | null {
-  const encoded = encodeProjectName(session.projectName)
-  const primaryPath = join(projectsDir, encoded, `${session.sessionId}.jsonl`)
-  if (existsSync(primaryPath)) return primaryPath
+  const candidates: string[] = []
 
-  const urlEncoded = encodeURIComponent(session.projectName)
-  const fallbackPath = join(projectsDir, urlEncoded, `${session.sessionId}.jsonl`)
-  if (existsSync(fallbackPath)) return fallbackPath
+  // Direct encoding of what's in the DB
+  candidates.push(encodeProjectName(session.projectName))
+
+  // If no leading '/', try with leading '/' (DB sometimes strips it)
+  if (!session.projectName.startsWith("/")) {
+    candidates.push(encodeProjectName(`/${session.projectName}`))
+  }
+
+  // If has leading '/', try without it
+  if (session.projectName.startsWith("/")) {
+    candidates.push(encodeProjectName(session.projectName.slice(1)))
+  }
+
+  // URL-encoded fallback
+  candidates.push(encodeURIComponent(session.projectName))
+
+  for (const encoded of candidates) {
+    const filePath = join(projectsDir, encoded, `${session.sessionId}.jsonl`)
+    if (existsSync(filePath)) return filePath
+  }
 
   return null
 }
