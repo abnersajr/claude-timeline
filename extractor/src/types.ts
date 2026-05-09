@@ -95,6 +95,12 @@ export interface ToolCall {
   result?: string
   isError?: boolean
   timestamp?: string
+  /** Whether this tool call is a Task (subagent spawn) */
+  isTask: boolean
+  /** Description of the task, extracted from Task tool input */
+  taskDescription?: string
+  /** Subagent type, extracted from Task tool input */
+  taskSubagentType?: string
 }
 
 /** Single API call record */
@@ -103,6 +109,8 @@ export interface Turn {
   tokenUsage: TokenUsage
   toolName?: string
   cwd?: string
+  /** Model used for this specific turn (detected from assistant message). Falls back to session-level model when undefined. */
+  model?: string
   messages: Message[]
   toolCalls: ToolCall[]
   cacheWriteType: "5m" | "1h" | "none"
@@ -121,6 +129,7 @@ export interface SessionMetadata {
   totalTokens: TokenUsage
   startTime: string
   endTime: string
+  isOngoing: boolean
 }
 
 /** Model pricing config */
@@ -160,6 +169,16 @@ export interface ToolExecution {
   endTime: string
 }
 
+/** Discovered subagent file */
+export interface SubagentFile {
+  /** Absolute path to the JSONL file */
+  filePath: string
+  /** Agent ID extracted from filename (e.g., "abc123" from "agent-abc123.jsonl") */
+  agentId: string
+  /** Whether this file is from the NEW nested structure */
+  isNewStructure: boolean
+}
+
 /** Subagent session */
 export interface Subagent {
   id: string
@@ -170,6 +189,28 @@ export interface Subagent {
   turnCount: number
   status: "completed" | "failed" | "pending"
   isParallel: boolean
+  /** Model used by the subagent */
+  model?: string
+  /** Aggregated token usage (request-id deduplicated) */
+  totalTokens?: TokenUsage
+  /** Messages from the subagent session */
+  messages?: Message[]
+  /** Tool calls from the subagent session */
+  toolCalls?: ToolCall[]
+}
+
+/** Conversation group: user message + all AI responses until next user message */
+export interface ConversationGroup {
+  id: string
+  userMessage?: Message
+  aiResponses: Message[]
+  toolExecutions: ToolCall[]
+  processIds: string[]
+  startTime: string
+  endTime: string
+  durationMs: number
+  tokenUsage: TokenUsage
+  totalCost: number
 }
 
 /** Final output shape */
@@ -177,4 +218,52 @@ export interface FullTimelineSession {
   session: SessionMetadata
   turns: Turn[]
   pricing: SessionPricing
+  contextStats?: ContextStats
+  subagents?: Subagent[]
+  conversationGroups?: ConversationGroup[]
+}
+
+// ─── Context Tracking Types ──────────────────────────────────────────
+
+/** Context categories for token tracking */
+export type ContextCategory =
+  | "user-message"
+  | "tool-output"
+  | "thinking-text"
+  | "system"
+  | "compact"
+  | "other"
+
+/** A compaction phase in the session (bounded by compact events) */
+export interface Phase {
+  phaseNumber: number
+  startRecordIndex: number
+  endRecordIndex: number
+}
+
+/** A single context injection record tracking what consumed tokens */
+export interface ContextInjection {
+  recordIndex: number
+  category: ContextCategory
+  inputTokens: number
+  timestamp?: string
+  phaseNumber: number
+}
+
+/** Per-turn context snapshot */
+export interface TurnContextSnapshot {
+  recordIndex: number
+  category: ContextCategory
+  inputTokens: number
+  phaseNumber: number
+  timestamp?: string
+}
+
+/** Session-level context statistics */
+export interface ContextStats {
+  injections: ContextInjection[]
+  tokensByCategory: Record<ContextCategory, number>
+  totalInputTokens: number
+  phaseCount: number
+  phases: Phase[]
 }

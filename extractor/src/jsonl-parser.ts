@@ -1,6 +1,12 @@
 import { existsSync, readFileSync } from "node:fs"
 import { classifyMessage } from "./classifier"
 import { deduplicateByRequestId } from "./dedup"
+import {
+  extractToolCalls,
+  extractToolResults,
+  formatToolResult,
+  linkToolResults,
+} from "./tool-extraction"
 import type { MessageCategory, RawJsonlRecord, ToolCall } from "./types"
 
 /** Result of parsing a JSONL session file */
@@ -56,22 +62,29 @@ export function parseSessionJsonl(
     }
 
     // Extract tool calls from assistant messages
-    if (record.type === "assistant" && record.message?.content && Array.isArray(record.message.content)) {
-      const indices: number[] = []
-      for (const block of record.message.content) {
-        if (block.type === "tool_use") {
-          const idx = toolCalls.length
-          toolCalls.push({
-            toolUseId: (block.id ?? block.toolUseId) as string,
-            name: block.name as string,
-            input: block.input as Record<string, unknown>,
-            timestamp: record.timestamp,
-          })
-          indices.push(idx)
-        }
-      }
-      if (indices.length > 0 && record.uuid) {
+    if (record.type === "assistant" && record.message?.content) {
+      const newCalls = extractToolCalls(record.message.content, record.timestamp)
+      const startIdx = toolCalls.length
+      toolCalls.push(...newCalls)
+
+      if (newCalls.length > 0 && record.uuid) {
+        const indices = Array.from({ length: newCalls.length }, (_, i) => startIdx + i)
         assistantToolCallIndices.set(record.uuid, indices)
+      }
+    }
+
+    // Extract tool results from user messages (meta messages with tool_result blocks)
+    if (record.type === "user" && record.isMeta && record.message?.content) {
+      const results = extractToolResults(record.message.content)
+      if (results.length > 0) {
+        // Link results to tool calls by toolUseId
+        const updatedCalls = linkToolResults(toolCalls, results)
+        // Update the toolCalls array with linked results
+        for (let i = 0; i < updatedCalls.length; i++) {
+          if (updatedCalls[i].result !== toolCalls[i].result) {
+            toolCalls[i] = updatedCalls[i]
+          }
+        }
       }
     }
 
@@ -80,17 +93,7 @@ export function parseSessionJsonl(
       const indices = assistantToolCallIndices.get(record.parentUuid)
       if (indices) {
         const result = record.toolUseResult as Record<string, unknown>
-        // Extract meaningful result content
-        let resultStr: string
-        if (result.stdout !== undefined) {
-          resultStr = String(result.stdout)
-          if (result.stderr) resultStr += `\n[stderr]: ${result.stderr}`
-        } else if (result.questions !== undefined) {
-          resultStr = JSON.stringify({ questions: result.questions, answers: result.answers })
-        } else {
-          resultStr = JSON.stringify(result)
-        }
-
+        const resultStr = formatToolResult(result)
         const isError = Boolean(result.interrupted) || Boolean(result.stderr)
 
         // Attach result to all tool calls from the parent assistant message
