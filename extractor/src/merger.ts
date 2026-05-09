@@ -117,7 +117,7 @@ function normalizeContent(content: Array<Record<string, unknown>> | string): Mes
         type: "tool_use" as const,
         name: String(block.name ?? ""),
         input: (block.input as Record<string, unknown>) ?? {},
-        toolUseId: String(block.toolUseId ?? ""),
+        toolUseId: String(block.id ?? block.toolUseId ?? ""),
       }
     }
     if (type === "tool_result") {
