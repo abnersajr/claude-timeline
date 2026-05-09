@@ -135,6 +135,16 @@ export interface SessionPricing {
   pricingRate: PricingRate
 }
 
+/** Matched tool call with result and timing */
+export interface ToolExecution {
+  toolCall: ToolCall
+  result?: string
+  isError?: boolean
+  durationMs: number
+  startTime: string
+  endTime: string
+}
+
 /** Final output shape */
 export interface FullTimelineSession {
   session: SessionMetadata
