@@ -69,6 +69,16 @@ describe("index", () => {
       const config = parseArgs(["node", "src/index.ts", "--session-id", "test"])
       expect(config.outputPath).toBeNull()
     })
+
+    it("should parse --list-sessions flag", () => {
+      const config = parseArgs(["node", "src/index.ts", "--list-sessions"])
+      expect(config.listSessions).toBe(true)
+      expect(config.sessionId).toBeNull()
+    })
+
+    it("should not require --session-id when --list-sessions is set", () => {
+      expect(() => parseArgs(["node", "src/index.ts", "--list-sessions"])).not.toThrow()
+    })
   })
 
   describe("outputJSON", () => {
