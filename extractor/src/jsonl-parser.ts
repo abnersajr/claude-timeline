@@ -1,11 +1,12 @@
 import { existsSync, readFileSync } from "node:fs"
+import { classifyMessage } from "./classifier"
 import { deduplicateByRequestId } from "./dedup"
-import { isDisplayableEntry } from "./noise-filter"
-import type { RawJsonlRecord, ToolCall } from "./types"
+import type { MessageCategory, RawJsonlRecord, ToolCall } from "./types"
 
 /** Result of parsing a JSONL session file */
 export interface JsonlParseResult {
   rawMessages: RawJsonlRecord[]
+  categories: MessageCategory[]
   toolCalls: ToolCall[]
   malformedCount: number
 }
@@ -39,10 +40,12 @@ export function parseSessionJsonl(
       continue
     }
 
-    // Filter noise
-    if (!isDisplayableEntry(entry)) continue
-
     const record = entry as unknown as RawJsonlRecord
+
+    // Classify and filter hard noise
+    const category = classifyMessage(record)
+    if (category === "hardNoise") continue
+
     rawMessages.push(record)
 
     // Normalize cache creation breakdown from JSONL
@@ -99,8 +102,12 @@ export function parseSessionJsonl(
     }
   }
 
+  const deduped = deduplicateByRequestId(rawMessages)
+  const categories = deduped.map((r) => classifyMessage(r))
+
   return {
-    rawMessages: deduplicateByRequestId(rawMessages),
+    rawMessages: deduped,
+    categories,
     toolCalls,
     malformedCount,
   }
