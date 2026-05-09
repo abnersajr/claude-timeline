@@ -1,5 +1,8 @@
 # Project AGENTS.md
 
+## Task Management
+Use `/dex` to break down complex work, track progress across sessions, and coordinate multi-step implementations.
+
 ## Project Scope
 Claude Code session timeline extractor: extract, merge, and structure session data from local Claude Code storage to rebuild full session timelines.
 
