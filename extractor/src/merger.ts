@@ -1,6 +1,11 @@
+import { buildConversationGroups } from "./conversation-groups"
+import { computeContextStats } from "./context-tracker"
 import { getSession, getTurns } from "./db-reader"
 import { parseSessionJsonl } from "./jsonl-parser"
 import { calculateSessionCost } from "./pricing"
+import { detectSessionState } from "./session-state"
+import { listSubagentFiles } from "./subagent-locator"
+import { resolveSubagents } from "./subagent-resolver"
 import type { FullTimelineSession, Message, MessageContent, RawJsonlRecord, Turn } from "./types"
 import { resolveSessionJsonlPath } from "./utils"
 
@@ -94,7 +99,22 @@ export function matchTurnsToMessages(
       }
     }
 
-    return { ...turn, messages: normalizedMessages, toolCalls: matchedToolCalls, tokenUsage: mergedTokenUsage }
+    // Extract model from first assistant message in matched messages
+    let turnModel: string | undefined
+    for (const msg of matchedMessages) {
+      if (msg.type === "assistant" && msg.message?.model) {
+        turnModel = msg.message.model
+        break
+      }
+    }
+
+    return {
+      ...turn,
+      model: turnModel,
+      messages: normalizedMessages,
+      toolCalls: matchedToolCalls,
+      tokenUsage: mergedTokenUsage,
+    }
   })
 
   return matched
@@ -210,12 +230,28 @@ export async function extractFullTimeline(
   // 5. Calculate pricing
   const pricing = calculateSessionCost(session, enrichedTurns)
 
-  // 6. Extract command executed from JSONL
+  // 6. Compute context stats from raw JSONL records
+  const contextStats = computeContextStats(jsonlResult?.rawMessages ?? [])
+
+  // 7. Extract command executed from JSONL
   const commandExecuted = extractCommandExecuted(jsonlResult?.rawMessages ?? [])
 
+  // 8. Detect session state (ongoing vs completed)
+  const { isOngoing } = detectSessionState(jsonlResult?.rawMessages ?? [])
+
+  // 9. Resolve subagents (discover files, parse, link to Task calls)
+  const subagentFiles = listSubagentFiles(projectsDir, session.projectName, sessionId)
+  const subagents = resolveSubagents(subagentFiles, jsonlResult?.toolCalls ?? [])
+
+  // 10. Build conversation groups from enriched turns
+  const conversationGroups = buildConversationGroups(enrichedTurns)
+
   return {
-    session: { ...session, commandExecuted },
+    session: { ...session, commandExecuted, isOngoing },
     turns: enrichedTurns,
     pricing,
+    contextStats,
+    ...(subagents.length > 0 ? { subagents } : {}),
+    ...(conversationGroups.length > 0 ? { conversationGroups } : {}),
   }
 }
