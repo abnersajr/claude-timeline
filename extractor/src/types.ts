@@ -145,6 +145,18 @@ export interface ToolExecution {
   endTime: string
 }
 
+/** Subagent session */
+export interface Subagent {
+  id: string
+  parentTaskId: string
+  description: string
+  startTime: string
+  endTime: string
+  turnCount: number
+  status: "completed" | "failed" | "pending"
+  isParallel: boolean
+}
+
 /** Final output shape */
 export interface FullTimelineSession {
   session: SessionMetadata
