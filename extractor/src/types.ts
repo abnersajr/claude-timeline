@@ -1,3 +1,12 @@
+/** Message category from the 5-category cascade */
+export type MessageCategory = "user" | "assistant" | "system" | "compact" | "hardNoise"
+
+/** A message paired with its classified category */
+export interface ClassifiedMessage {
+  record: RawJsonlRecord
+  category: MessageCategory
+}
+
 /** Per-turn token counts */
 export interface TokenUsage {
   inputTokens: number
@@ -16,6 +25,11 @@ export interface RawJsonlRecord {
   uuid?: string
   parentUuid?: string
   requestId?: string
+  isMeta?: boolean
+  isSidechain?: boolean
+  isCompactSummary?: boolean
+  agentId?: string
+  sourceToolUseID?: string
   message?: {
     role: string
     content: Array<Record<string, unknown>> | string
