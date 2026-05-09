@@ -19,7 +19,19 @@ export interface RawJsonlRecord {
     role: string
     content: Array<Record<string, unknown>> | string
     model?: string
-    usage?: TokenUsage
+    usage?: {
+      input_tokens?: number
+      output_tokens?: number
+      cache_read_input_tokens?: number
+      cache_creation_input_tokens?: number
+      cache_creation?: {
+        ephemeral_5m_input_tokens?: number
+        ephemeral_1h_input_tokens?: number
+      }
+      // Normalized fields (populated by parser)
+      cacheCreation5mTokens?: number
+      cacheCreation1hTokens?: number
+    }
   }
   toolUseResult?: {
     toolUseId: string
