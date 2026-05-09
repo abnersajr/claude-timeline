@@ -1,0 +1,26 @@
+{
+  "name": "@timeline/extractor",
+  "version": "1.0.0",
+  "description": "Claude Code session timeline extractor",
+  "type": "module",
+  "main": "./src/index.ts",
+  "engines": {
+    "node": ">=24.15.0",
+    "pnpm": ">=11.0.0"
+  },
+  "scripts": {
+    "extract": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.7.0",
+    "minimist": "^1.2.8"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/minimist": "^1.2.5",
+    "@types/node": "^22.10.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  }
+}
