@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { matchToolCalls, buildToolResultMap } from "../src/tool-matcher"
+import { collectToolCalls, matchToolCalls, buildToolResultMap } from "../src/tool-matcher"
 import type { ToolCall } from "../src/types"
 
 describe("tool-matcher", () => {
@@ -91,14 +91,14 @@ describe("tool-matcher", () => {
           type: "user",
           uuid: "u1",
           parentUuid: "a1",
-          toolUseResult: { stdout: "file1.txt\nfile2.txt", stderr: "", interrupted: false },
+          toolUseResult: { toolUseId: "toolu_01abc", stdout: "file1.txt\nfile2.txt", stderr: "", interrupted: false },
           timestamp: "2026-05-07T19:22:45.500Z",
         },
         {
           type: "user",
           uuid: "u2",
           parentUuid: "a2",
-          toolUseResult: { stdout: "Hello World", stderr: "", interrupted: false },
+          toolUseResult: { toolUseId: "toolu_02def", stdout: "Hello World", stderr: "", interrupted: false },
           timestamp: "2026-05-07T19:22:46.500Z",
         },
       ]
@@ -106,8 +106,8 @@ describe("tool-matcher", () => {
       const resultMap = buildToolResultMap(rawMessages)
 
       expect(resultMap.size).toBe(2)
-      expect(resultMap.get("a1")?.result).toBe("file1.txt\nfile2.txt")
-      expect(resultMap.get("a2")?.result).toBe("Hello World")
+      expect(resultMap.get("toolu_01abc")?.result).toBe("file1.txt\nfile2.txt")
+      expect(resultMap.get("toolu_02def")?.result).toBe("Hello World")
     })
 
     it("should handle error results", () => {
@@ -116,14 +116,14 @@ describe("tool-matcher", () => {
           type: "user",
           uuid: "u1",
           parentUuid: "a1",
-          toolUseResult: { stdout: "", stderr: "Command not found", interrupted: true },
+          toolUseResult: { toolUseId: "toolu_01abc", stdout: "", stderr: "Command not found", interrupted: true },
           timestamp: "2026-05-07T19:22:45.500Z",
         },
       ]
 
       const resultMap = buildToolResultMap(rawMessages)
 
-      expect(resultMap.get("a1")?.isError).toBe(true)
+      expect(resultMap.get("toolu_01abc")?.isError).toBe(true)
     })
 
     it("should skip messages without toolUseResult", () => {
@@ -142,11 +142,120 @@ describe("tool-matcher", () => {
       expect(resultMap.size).toBe(0)
     })
 
-    it("should skip messages without parentUuid", () => {
+    it("should skip results without toolUseId", () => {
       const rawMessages = [
         {
           type: "user",
           uuid: "u1",
+          parentUuid: "a1",
+          toolUseResult: { stdout: "result" },
+          timestamp: "2026-05-07T19:22:45.500Z",
+        },
+      ]
+
+      const resultMap = buildToolResultMap(rawMessages)
+
+      expect(resultMap.size).toBe(0)
+    })
+  })
+
+  describe("collectToolCalls", () => {
+    it("should collect tool calls from assistant messages", () => {
+      const rawMessages = [
+        {
+          type: "assistant",
+          uuid: "a1",
+          timestamp: "2026-05-07T19:22:45.118Z",
+          message: {
+            role: "assistant",
+            content: [
+              { type: "tool_use", id: "toolu_01", name: "Bash", input: { command: "ls" } },
+              { type: "tool_use", id: "toolu_02", name: "Read", input: { filePath: "/tmp/test.txt" } },
+            ],
+          },
+        },
+      ]
+
+      const toolCalls = collectToolCalls(rawMessages)
+
+      expect(toolCalls.length).toBe(2)
+      expect(toolCalls[0].toolUseId).toBe("toolu_01")
+      expect(toolCalls[0].name).toBe("Bash")
+      expect(toolCalls[1].toolUseId).toBe("toolu_02")
+      expect(toolCalls[1].name).toBe("Read")
+    })
+
+    it("should skip user messages", () => {
+      const rawMessages = [
+        {
+          type: "user",
+          uuid: "u1",
+          message: { role: "user", content: "Hello" },
+        },
+      ]
+
+      const toolCalls = collectToolCalls(rawMessages)
+
+      expect(toolCalls.length).toBe(0)
+    })
+
+    it("should handle messages without content array", () => {
+      const rawMessages = [
+        {
+          type: "assistant",
+          uuid: "a1",
+          message: { role: "assistant", content: "Hello" },
+        },
+      ]
+
+      const toolCalls = collectToolCalls(rawMessages)
+
+      expect(toolCalls.length).toBe(0)
+    })
+  })
+
+  describe("matchToolCalls duration edge cases", () => {
+    it("should handle invalid timestamps (NaN guard)", () => {
+      const toolCalls: ToolCall[] = [
+        { toolUseId: "toolu_01", name: "Bash", input: {}, timestamp: "invalid-date" },
+      ]
+
+      const toolResults = new Map([
+        ["toolu_01", { result: "output", isError: false, timestamp: "2026-05-07T19:22:45.500Z" }],
+      ])
+
+      const executions = matchToolCalls(toolCalls, toolResults)
+
+      expect(executions[0].durationMs).toBe(0)
+      expect(Number.isNaN(executions[0].durationMs)).toBe(false)
+    })
+  })
+
+  describe("buildToolResultMap toolUseId matching", () => {
+    it("should key results by toolUseId from result metadata", () => {
+      const rawMessages = [
+        {
+          type: "user",
+          uuid: "u1",
+          parentUuid: "a1",
+          toolUseResult: { toolUseId: "toolu_01", stdout: "result", stderr: "", interrupted: false },
+          timestamp: "2026-05-07T19:22:45.500Z",
+        },
+      ]
+
+      const resultMap = buildToolResultMap(rawMessages)
+
+      expect(resultMap.size).toBe(1)
+      expect(resultMap.has("toolu_01")).toBe(true)
+      expect(resultMap.get("toolu_01")?.result).toBe("result")
+    })
+
+    it("should skip results without toolUseId", () => {
+      const rawMessages = [
+        {
+          type: "user",
+          uuid: "u1",
+          parentUuid: "a1",
           toolUseResult: { stdout: "result" },
           timestamp: "2026-05-07T19:22:45.500Z",
         },

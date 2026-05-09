@@ -1,11 +1,38 @@
-import type { ToolCall, ToolExecution } from "./types"
+import type { RawJsonlRecord, ToolCall, ToolExecution } from "./types"
+
+/**
+ * Collect tool calls from raw JSONL messages.
+ * Extracts tool_use blocks from assistant messages.
+ */
+export function collectToolCalls(rawMessages: RawJsonlRecord[]): ToolCall[] {
+  const toolCalls: ToolCall[] = []
+
+  for (const msg of rawMessages) {
+    if (msg.type !== "assistant" || !msg.message?.content) continue
+    if (!Array.isArray(msg.message.content)) continue
+
+    for (const block of msg.message.content) {
+      if (block.type === "tool_use") {
+        toolCalls.push({
+          toolUseId: (block.id ?? block.toolUseId) as string,
+          name: block.name as string,
+          input: block.input as Record<string, unknown>,
+          timestamp: msg.timestamp,
+        })
+      }
+    }
+  }
+
+  return toolCalls
+}
 
 /**
  * Match tool calls to their results and compute timing.
  *
- * @param toolCalls - Tool calls extracted from JSONL
- * @param toolResults - Tool results extracted from JSONL (keyed by toolUseId)
- * @returns Array of ToolExecution sorted by startTime
+ * Matching strategy:
+ * 1. Primary: Match by sourceToolUseID (in tool result metadata)
+ * 2. Fallback: Match by parentUuid (user message → assistant message)
+ * 3. Fallback: Match by toolResults array (positional)
  */
 export function matchToolCalls(
   toolCalls: ToolCall[],
@@ -22,12 +49,10 @@ export function matchToolCalls(
 
     let durationMs = 0
     if (startTime && endTime && startTime !== endTime) {
-      try {
-        const start = new Date(startTime).getTime()
-        const end = new Date(endTime).getTime()
+      const start = new Date(startTime).getTime()
+      const end = new Date(endTime).getTime()
+      if (!Number.isNaN(start) && !Number.isNaN(end)) {
         durationMs = Math.max(0, end - start)
-      } catch {
-        durationMs = 0
       }
     }
 
@@ -50,7 +75,7 @@ export function matchToolCalls(
 
 /**
  * Build a map of tool results from raw JSONL records.
- * Tool results are in user messages with parentUuid matching assistant message uuid.
+ * Keys by toolUseId from toolUseResult metadata.
  */
 export function buildToolResultMap(
   rawMessages: Array<{
@@ -64,9 +89,12 @@ export function buildToolResultMap(
   const resultMap = new Map<string, { result: string; isError: boolean; timestamp: string }>()
 
   for (const msg of rawMessages) {
-    if (msg.type !== "user" || !msg.toolUseResult || !msg.parentUuid) continue
+    if (msg.type !== "user" || !msg.toolUseResult) continue
 
     const result = msg.toolUseResult as Record<string, unknown>
+    const toolUseId = result.toolUseId as string | undefined
+    if (!toolUseId) continue
+
     let resultStr: string
     if (result.stdout !== undefined) {
       resultStr = String(result.stdout)
@@ -79,7 +107,7 @@ export function buildToolResultMap(
 
     const isError = Boolean(result.interrupted) || Boolean(result.stderr)
 
-    resultMap.set(msg.parentUuid, {
+    resultMap.set(toolUseId, {
       result: resultStr,
       isError,
       timestamp: msg.timestamp || "",
