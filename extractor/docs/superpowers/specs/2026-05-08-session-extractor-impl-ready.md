@@ -1,7 +1,8 @@
 # Claude Code Session Extractor — Implementation-Ready Spec
 
 **Date**: 2026-05-08  
-**Status**: Approved by User (Sections 1–4), Addressing Spec Review Iter 4  
+**Updated**: 2026-05-09 — Incorporated claude-devtools analysis (streaming, noise filtering, subagent resolution, tool matching)  
+**Status**: Approved by User  
 **Phase**: 1 — Standalone TypeScript Data Extractor  
 
 ---
@@ -11,7 +12,14 @@
 ### 1.1 Success Criteria (Happy Path)
 - Given a valid `session_id`, extractor produces valid JSON matching `FullTimelineSession` schema
 - SQLite `usage.db` is read for session metadata + turn token counts
-- JSONL `session.jsonl` is parsed for messages + tool calls + cache creation breakdown
+- JSONL `session.jsonl` is parsed via **streaming readline** (not fs.readFileSync)
+- **RequestId deduplication**: Only last entry per requestId kept (streaming artifact)
+- **Noise filtering**: Skip system/summary/synthetic/hard-noise messages
+- **sourceToolUseID matching**: Tool calls matched to results via sourceToolUseID (primary)
+- **Subagent resolution**: Handle both NEW and OLD subagent directory structures
+- **Conversation grouping**: Group user message + AI responses
+- **Context consumption tracking**: Track tokens across compaction phases
+- **Ongoing session detection**: Mark sessions as in-progress vs completed
 - Cache tier tracking: 5m vs 1h writes (from JSONL), reads (inferred, UI-only)
 - Pricing calculated using hardcoded model rates (fallback to Sonnet 4.6 for unknown models)
 - Output: Pretty-printed JSON to stdout or `--output` file
@@ -27,226 +35,95 @@
 | Cache breakdown missing | Warning | Fallback to 5m assumption | 0 |
 | Unknown model | Warning | Use fallback pricing | 0 |
 | Output write failure | Warning | Fallback to stdout | 0 |
+| Subagent file parse error | Warning | Skip subagent, continue | 0 |
+| Warmup subagent | Info | Skip (not a real subagent) | 0 |
 
 ### 1.3 Non-Goals (YAGNI)
-- No streaming parser in Phase 1 (see `streaming-parser-plan.md` for future)
 - No multi-session support in Phase 1 (single session only)
 - No external API calls for pricing (hardcoded table only)
+- No UI rendering (data extraction only)
 
 ---
 
 ## 2. Module Interface Contracts
 
 ### 2.1 `types.ts`
-Defines core interfaces (see `2026-05-08-session-extractor-types.md` for full details):
-- `TokenUsage`, `Turn`, `Message`, `ToolCall`, `SessionMetadata`
+Defines complete interfaces (see `2026-05-08-session-extractor-types.md` for full details):
+- `TokenUsage`, `ParsedMessage`, `ToolCall`, `ToolResult`, `ToolExecution`
+- `Turn`, `ConversationGroup`, `TaskExecution`, `Subagent`
+- `SessionMetadata`, `PhaseTokenBreakdown`
 - `PricingRate`, `TurnPricing`, `SessionPricing`, `FullTimelineSession`
-- `RawJsonlRecord` (internal, not exported)
 
 ### 2.2 `db-reader.ts`
 ```typescript
-// Custom error classes for typed error handling
-class DbOpenError extends Error { code = 3; constructor(message: string) { super(message); } }
-class SessionNotFoundError extends Error { code = 2; constructor(sessionId: string) { super(`Session not found: ${sessionId}`); } }
+class DbOpenError extends Error { code = 3; }
+class SessionNotFoundError extends Error { code = 2; }
 
-// Throws DbOpenError on DB open failure, SessionNotFoundError if not found
 function getSession(dbPath: string, sessionId: string): SessionMetadata
-// Returns empty array if no turns found (valid case)
 function getTurns(dbPath: string, sessionId: string): Turn[]
-// Returns model from first turn (ORDER BY timestamp ASC LIMIT 1)
 function getModelForSession(dbPath: string, sessionId: string): string
 ```
 
-### 2.3 `jsonl-parser.ts`
+### 2.3 `noise-filter.ts`
 ```typescript
-// Returns null if file not found (caller handles)
-// Throws on critical I/O errors
-function parseSessionJsonl(jsonlPath: string | null, sessionId: string): {
-  rawMessages: RawJsonlRecord[];  // Unnormalized
-  toolCalls: ToolCall[];           // Extracted tool calls
-  malformedCount: number;        // For diagnostics
-} | null
+function isDisplayableEntry(entry: RawJsonlEntry): boolean
+function classifyMessage(msg: ParsedMessage): MessageCategory
 ```
 
-### 2.4 `merger.ts` (Orchestrator + Helpers)
-
+### 2.4 `jsonl-parser.ts`
 ```typescript
-// Main orchestrator (delegates to helpers)
-function extractFullTimeline(
-  sessionId: string,
-  dbPath: string,
-  projectsDir: string
-): FullTimelineSession {
-  // 1. Get session + turns from SQLite (db-reader.ts)
-  // 2. Find JSONL path via resolveSessionJsonlPath() (utils.ts, handle null)
-  // 3. Parse JSONL (jsonl-parser.ts, handle null → empty messages)
-  // 4. Match turns ↔ rawMessages (matcher.ts helper)
-  // 5. Normalize RawJsonlRecord → Message (normalizer.ts helper)
-  // 6. Infer cacheReadType per turn (cache-inference.ts helper)
-  // 7. Calculate pricing (pricing.ts)
-  // 8. Return FullTimelineSession
-}
-
-// Helper: Turn ↔ Message Matcher (internal to merger.ts)
-// Exported for testing only
-export function matchTurnsToMessages(
-  turns: Turn[],
-  rawMessages: RawJsonlRecord[]
-): { matchedTurns: Turn[]; unmatchedTurns: number; unmatchedMessages: number } {
-  // Deterministic algorithm (see §2.4)
-}
-
-// Helper: Normalizer (internal to merger.ts)
-// Exported for testing only
-export function normalizeRawMessage(raw: RawJsonlRecord): Message {
-  // Extract Message from RawJsonlRecord
-  // Set Message.cacheWriteType from raw.message?.usage?.cache_creation
-}
-
-// Helper: Cache Inference (internal to merger.ts)
-// Exported for testing only
-export function inferCacheReadType(/*...*/): '5m' | '1h' | '5m-fallback' | 'unknown' {
-  // See §2.4.1
-}
+// Streaming readline by default (not fs.readFileSync)
+async function parseSessionJsonl(jsonlPath: string): ParsedMessage[]
+function deduplicateByRequestId(messages: ParsedMessage[]): ParsedMessage[]
 ```
 
-// JSONL path resolution (explicit contract):
-// Returns null if not found (caller handles)
-function resolveSessionJsonlPath(
-  session: SessionMetadata,
-  projectsDir: string
-): string | null {
-  // 1. Primary: projectName with "/" → "-" (e.g., "/Users/foo" → "-Users-foo")
-  // 2. Fallback: URL-encoded version (encodeURIComponent)
-  // 3. Returns null if neither found
-}
-
-// Turn matching algorithm (deterministic):
-// 1. Primary: Find rawMsg with |turn.timestamp - rawMsg.timestamp| < 5s
-//    - If exactly ONE match → use it
-//    - If MULTIPLE matches → use uuid match (if turn has uuid)
-//    - If NO uuid match among multiples → use FIRST match (lowest index)
-// 2. Fallback: turn[i] → rawMessages[i] (assumes both ordered by time)
-// 3. Unmatched turns/messages → log warning with counts
+### 2.5 `tool-matcher.ts`
+```typescript
+// Uses sourceToolUseID as primary matching (not timestamp)
+function buildToolExecutions(messages: ParsedMessage[]): ToolExecution[]
 ```
 
-### 2.4.1 Cache Read Type Inference (Reproducible Algorithm)
+### 2.6 `subagent-resolver.ts`
 ```typescript
-// NOTE: cacheReadType is for UI display ONLY (not for billing).
-// Pricing uses cacheReadPerMTok (same rate for both tiers).
-// This algorithm is NOT definitive — see CONTRIBUTING.md > Key Assumptions.
-
-// Ownership (canonical):
-// - jsonl-parser.ts: Sets Turn.cacheWriteType during normalization
-//   (extracts from RawJsonlRecord.message.usage.cache_creation)
-// - merger.ts: Only READS cacheWriteType to infer cacheReadType
-// - merger.ts: Sets Turn.cacheReadType using inferCacheReadType()
-
-function inferCacheReadType(
-  turnIndex: number,
-  turns: Turn[],
-  currentTurnTime: string
-): '5m' | '1h' | '5m-fallback' | 'unknown' {
-  try {
-    const time = new Date(currentTurnTime).getTime();
-    if (isNaN(time)) return 'unknown';
-    
-    const prevTurn = turns[turnIndex - 1];
-    if (!prevTurn) return '5m-fallback'; // No previous turn → assume 5m default
-    
-    const prevTime = new Date(prevTurn.timestamp).getTime();
-    if (isNaN(prevTime)) return 'unknown';
-    
-    const timeDiff = time - prevTime;
-    
-    // If previous turn wrote to 1h cache, check if within 1 hour
-    if (prevTurn.cacheWriteType === '1h' && timeDiff < 60 * 60 * 1000) {
-      return '1h';
-    }
-    // If previous turn wrote to 5m cache, check if within 5 minutes
-    if (prevTurn.cacheWriteType === '5m' && timeDiff < 5 * 60 * 1000) {
-      return '5m';
-    }
-    
-    return '5m-fallback'; // Default assumption (Anthropic's default TTL)
-  } catch (err) {
-    return 'unknown'; // Only on actual parse errors
-  }
-}
+// Handles both NEW and OLD subagent directory structures
+async function discoverSubagentFiles(projectsDir: string, sessionId: string): Promise<string[]>
+async function resolveSubagents(
+  projectsDir: string, sessionId: string,
+  taskCalls: ToolCall[], messages: ParsedMessage[]
+): Promise<Subagent[]>
 ```
 
-### 2.4.2 Normalization Ownership (Canonical Statement)
+### 2.7 `merger.ts`
 ```typescript
-// Single source of truth for normalization:
-// 1. jsonl-parser.ts: parseSessionJsonl() returns { rawMessages: RawJsonlRecord[] }
-// 2. merger.ts: normalizeRawMessage(raw: RawJsonlRecord): Message
-//    - Extracts Message from RawJsonlRecord
-//    - Sets Message.cacheWriteType from raw.message.usage.cache_creation
-// 3. merger.ts: matchTurnsToMessages() calls normalizeRawMessage()
-//    - Attaches normalized Message to Turn
-// 4. jsonl-parser.ts does NOT export RawJsonlRecord (internal only)
+// Main orchestrator
+function extractFullTimeline(sessionId: string, dbPath: string, projectsDir: string): FullTimelineSession
+
+// Helpers (exported for testing)
+function buildConversationGroups(messages: ParsedMessage[], subagents: Subagent[]): ConversationGroup[]
+function trackContextConsumption(messages: ParsedMessage[]): { contextConsumption: number; compactionCount: number; phaseBreakdown: PhaseTokenBreakdown[] }
+function checkSessionOngoing(messages: ParsedMessage[]): boolean
+function inferCacheReadType(turnIndex: number, turns: Turn[], currentTurnTime: string): '5m' | '1h' | 'unknown'
+function matchTurnsToMessages(turns: Turn[], messages: ParsedMessage[]): { matchedTurns: Turn[]; unmatchedTurns: number; unmatchedMessages: number }
 ```
 
-### 2.4.3 JSONL Parser Error Taxonomy
+### 2.8 `pricing.ts`
 ```typescript
-// jsonl-parser.ts error handling:
-// - File not found (ENOENT) → returns null (caller handles)
-// - Critical I/O errors (EISDIR, EACCES, EMFILE) → throws JsonlParseError
-// - Malformed lines → skip, increment malformedCount, continue
-
-class JsonlParseError extends Error {
-  code = 'JSONL_PARSE_ERROR';
-  constructor(message: string) { super(message); }
-}
-
-// Error mapping table:
-// | Error Code | Severity | Action |
-// |------------|----------|--------|
-// | ENOENT     | Warning  | Return null (caller handles) |
-// | EISDIR     | Fatal    | Throw JsonlParseError (exit code 3) |
-// | EACCES     | Fatal    | Throw JsonlParseError (exit code 3) |
-// | EMFILE     | Fatal    | Throw JsonlParseError (exit code 3) |
-// | Other      | Warning  | Log, continue (non-critical) |
-
-// Example: Critical I/O failure
-try {
-  fs.readFileSync(jsonlPath, 'utf-8');
-} catch (err) {
-  if (['EISDIR', 'EACCES', 'EMFILE'].includes(err.code)) {
-    throw new JsonlParseError(`Critical I/O error: ${err.message}`);
-  }
-  if (err.code === 'ENOENT') return null; // Caller handles
-  // Other errors: log warning, continue
-  console.warn(`⚠️  Non-critical I/O error: ${err.message}`);
-}
-```
-
-### 2.5 `pricing.ts`
-```typescript
-// Returns fallback (Sonnet 4.6) for unknown models (logs warning)
 function getPricing(modelName: string): PricingRate
-// cacheReadType is UI-only (pricing same for both tiers)
 function calculateSessionCost(session: SessionMetadata, turns: Turn[]): SessionPricing
 ```
 
-### 2.6 `index.ts`
+### 2.9 `index.ts`
 ```typescript
-// Exit codes: 0=success (may have warnings), 1=usage error, 2=session not found, 3=DB open failure
 function parseArgs(argv: string[]): Config | never
 function outputJSON(data: FullTimelineSession, outputPath: string | null): void
 ```
 
-### 2.7 `utils.ts`
+### 2.10 `utils.ts`
 ```typescript
-// CLAUDE_CONFIG_DIR env var support:
-// - If set: dbPath = `${CLAUDE_CONFIG_DIR}/usage.db`
-// - If set: projectsDir = `${CLAUDE_CONFIG_DIR}/projects`
-// - Default: ~/.claude/usage.db and ~/.claude/projects
 function getDbPath(customPath?: string): string
 function getProjectsDir(customPath?: string): string
-// Project name encoding: replace "/" with "-"
-// Fallback: try URL-encoded version if "-" version not found
 function encodeProjectName(projectName: string): string
+function resolveSessionJsonlPath(session: SessionMetadata, projectsDir: string): string | null
 ```
 
 ---
@@ -256,13 +133,19 @@ function encodeProjectName(projectName: string): string
 | Rule | Behavior |
 |------|----------|
 | Turn ordering | SQLite turns ORDER BY timestamp ASC |
-| Message matching (canonical - §2.4) | Primary: ±5s timestamp window; If multiple: use uuid match; If no uuid: use FIRST match; Fallback: turn[i] → rawMessages[i] |
-| Unmatched turns | Keep turn with empty messages, log warning with count |
-| Unmatched messages | If index-based: attach to turn[i]; If timestamp match: attach to nearest turn; log warning with count |
+| Message matching | Primary: ±5s timestamp window; If multiple: use uuid match; Fallback: turn[i] → messages[i] |
+| Tool call matching | Primary: sourceToolUseID; Fallback: toolResults array |
+| Unmatched turns | Keep turn with empty messages, log warning |
+| Unmatched messages | Attach to nearest turn, log warning |
 | Token counts | SQLite is authoritative (billed amounts) |
 | Cache creation breakdown | JSONL is authoritative (has 5m/1h breakdown) |
 | Cache read type | Inferred from previous turn (UI-only, not for billing) |
-| Pricing | Hardcoded table, fallback to Sonnet 4.6, log warning |
+| Pricing | Hardcoded table, fallback to Sonnet 4.6 |
+| Noise filtering | Skip system/summary/synthetic/hard-noise messages |
+| Subagent resolution | NEW + OLD structures, skip warmup/compact |
+| Conversation grouping | User message + AI responses until next user message |
+| Context consumption | Track tokens across compaction phases |
+| Ongoing detection | Activity vs ending events, 5min stale threshold |
 
 ---
 
@@ -299,12 +182,31 @@ function encodeProjectName(projectName: string): string
 | `db-reader.ts` | Valid session → returns SessionMetadata |
 | `db-reader.ts` | Session not found → throws with exit code 2 |
 | `db-reader.ts` | DB open failure → throws with exit code 3 |
-| `jsonl-parser.ts` | Valid JSONL → returns rawMessages + toolCalls |
-| `jsonl-parser.ts` | File not found → returns null |
-| `jsonl-parser.ts` | Malformed lines → skips, increments malformedCount |
-| `merger.ts` | Turn ↔ message matching (timestamp, uuid, index fallback) |
-| `merger.ts` | Cache creation breakdown extraction (5m vs 1h) |
+| `noise-filter.ts` | Filter system/summary/file-history-snapshot/queue-operation |
+| `noise-filter.ts` | Filter synthetic assistant messages |
+| `noise-filter.ts` | Filter sidechain messages |
+| `noise-filter.ts` | Filter hard noise tags (<local-command-caveat>, <system-reminder>) |
+| `noise-filter.ts` | Keep real user/assistant messages |
+| `noise-filter.ts` | Keep meta user messages (tool results) |
+| `jsonl-parser.ts` | Streaming parse → returns ParsedMessage[] |
+| `jsonl-parser.ts` | File not found → returns empty array |
+| `jsonl-parser.ts` | Malformed lines → skips, continues |
+| `jsonl-parser.ts` | Dedup by requestId → keeps last entry |
+| `jsonl-parser.ts` | Extract all metadata fields |
+| `tool-matcher.ts` | Match via sourceToolUseID |
+| `tool-matcher.ts` | Fallback to toolResults array |
+| `tool-matcher.ts` | Handle calls without results |
+| `subagent-resolver.ts` | Discover NEW structure files |
+| `subagent-resolver.ts` | Skip warmup subagents |
+| `subagent-resolver.ts` | Skip compact files |
+| `subagent-resolver.ts` | Link to Task calls via agentId |
+| `subagent-resolver.ts` | Detect parallel execution |
+| `merger.ts` | Turn ↔ message matching |
+| `merger.ts` | Cache creation breakdown extraction |
 | `merger.ts` | Cache read type inference |
+| `merger.ts` | Conversation grouping |
+| `merger.ts` | Context consumption tracking |
+| `merger.ts` | Ongoing session detection |
 | `pricing.ts` | Known model → correct rates |
 | `pricing.ts` | Unknown model → fallback + warning |
 | `utils.ts` | Path resolution (CLAUDE_CONFIG_DIR, defaults) |
@@ -325,18 +227,24 @@ function encodeProjectName(projectName: string): string
 | Invalid session | `tsx src/index.ts --session-id <invalid>` | Exit 2, stderr = error message |
 | Missing arg | `tsx src/index.ts` | Exit 1, stderr = usage help |
 | Output file | `tsx src/index.ts --session-id <valid> --output out.json` | Exit 0, out.json = valid JSON |
-| Output dir missing | `tsx src/index.ts --session-id <valid> --output /nonexist/out.json` | Exit 0, fallback to stdout, stderr = warning |
 
 ---
 
 ## 6. Key Decisions Summary
 
 1. **Modular architecture** (Approach 2) — clear boundaries, testable units
-2. **SQLite authoritative for tokens**, JSONL for cache breakdown
-3. **Cache read type is inferred** (not definitive) — UI-only display
-4. **Pricing hardcoded** — no external API calls
-5. **Single session only** in Phase 1 — multi-session is future
-6. **Streaming parser is future** — see `streaming-parser-plan.md`
+2. **Streaming readline by default** — not fs.readFileSync
+3. **RequestId deduplication** — keep only last entry per requestId
+4. **Noise filtering** — skip system/summary/synthetic/hard-noise messages
+5. **sourceToolUseID matching** — primary method for tool call ↔ result pairing
+6. **Subagent resolution** — handle both NEW and OLD directory structures
+7. **Conversation grouping** — group user message + AI responses
+8. **Context consumption tracking** — track tokens across compaction phases
+9. **Ongoing session detection** — mark sessions as in-progress vs completed
+10. **SQLite authoritative for tokens**, JSONL for cache breakdown
+11. **Cache read type is inferred** (not definitive) — UI-only display
+12. **Pricing hardcoded** — no external API calls
+13. **Single session only** in Phase 1 — multi-session is future
 
 ---
 
@@ -345,8 +253,9 @@ function encodeProjectName(projectName: string): string
 - Full TypeScript interfaces: `2026-05-08-session-extractor-types.md`
 - Data flow & error handling: `2026-05-08-session-extractor-dataflow.md`
 - Assumptions & caveats: `2026-05-08-session-extractor-appendix.md`
-- Streaming parser plan: `streaming-parser-plan.md`
+- Implementation plan: `2026-05-08-session-extractor-impl.md`
 - Session report (data schemas): `session-report.md`
+- claude-devtools (inspiration): https://github.com/matt1398/claude-devtools
 
 ---
 

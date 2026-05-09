@@ -1,0 +1,40 @@
+# Dependencies
+node_modules/
+extractor/node_modules/
+
+# Lock files
+pnpm-lock.yaml
+skills-lock.json
+
+# Build outputs
+dist/
+build/
+*.tsbuildinfo
+*.tgz
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Dex
+.dex/
+
+# Temporary
+*.tmp
+*.temp

@@ -1,6 +1,6 @@
 ## 2. Data Models (`types.ts`)
 
-Based on `session-report.md` schemas (sections 2.1, 3.3.2, 4.1, 4.2).
+Based on `session-report.md` schemas (sections 2.1, 3.3.2, 4.1, 4.2) and [claude-devtools](https://github.com/matt1398/claude-devtools) data model.
 
 ### 2.1 Token Usage (per turn/session)
 
@@ -20,7 +20,102 @@ export interface TokenUsage {
 }
 ```
 
-### 2.2 Turn Data (from SQLite `turns` table + JSONL messages)
+### 2.2 ParsedMessage (complete JSONL entry — primary data type)
+
+Inspired by claude-devtools' `ParsedMessage`. This is the core type returned by the streaming JSONL parser.
+
+```typescript
+// Complete parsed JSONL entry with all metadata fields
+// Source: claude-devtools types + session-report.md Section 3.3.4
+export interface ParsedMessage {
+  // Identity
+  uuid: string;                          // Message UUID
+  parentUuid: string | null;             // Parent message UUID (for threading)
+  
+  // Type & Role
+  type: MessageType;                     // 'user' | 'assistant' | 'system' | 'summary' | 'file-history-snapshot' | 'queue-operation'
+  role?: string;                         // 'user' | 'assistant'
+  
+  // Content
+  content: string | ContentBlock[];      // String or array of content blocks
+  timestamp: Date;                       // Parsed timestamp
+  
+  // Token Usage (from assistant messages)
+  usage?: TokenUsage;                    // Token counts for this message
+  model?: string;                        // Model used (e.g., "claude-sonnet-4-6")
+  requestId?: string;                    // API request ID (for streaming dedup)
+  
+  // Metadata
+  cwd?: string;                          // Working directory
+  gitBranch?: string;                    // Git branch name
+  agentId?: string;                      // Subagent ID (if subagent message)
+  
+  // Message Classification
+  isSidechain: boolean;                  // true = subagent message, false = main thread
+  isMeta: boolean;                       // true = internal tool result message
+  isCompactSummary: boolean;             // true = compaction summary message
+  userType?: string;                     // User message subtype
+  
+  // Tool Call Linking
+  sourceToolUseID?: string;             // Links tool result → tool call (most accurate)
+  sourceToolAssistantUUID?: string;      // Links to assistant message that made the call
+  toolUseResult?: Record<string, unknown>; // Enriched tool result data
+  
+  // Extracted Tool Info
+  toolCalls: ToolCall[];                 // Tool calls from this message
+  toolResults: ToolResult[];             // Tool results from this message
+}
+
+export type MessageType = 'user' | 'assistant' | 'system' | 'summary' | 'file-history-snapshot' | 'queue-operation';
+
+export type MessageCategory = 'user' | 'system' | 'compact' | 'hardNoise' | 'ai';
+
+// Content blocks within messages
+export interface ContentBlock {
+  type: 'text' | 'tool_use' | 'tool_result' | 'thinking' | 'image';
+  text?: string;
+  thinking?: string;
+  id?: string;
+  name?: string;
+  input?: Record<string, unknown>;
+  tool_use_id?: string;
+  content?: string | ContentBlock[];
+  isError?: boolean;
+}
+```
+
+### 2.3 Tool Call & Tool Result
+
+```typescript
+// Tool call extracted from assistant messages
+// Matches session-report.md Section 4.2 (Tool Used, Exact Command, Tool Result)
+export interface ToolCall {
+  id: string;                          // Tool use ID (matches ToolResult.toolUseId)
+  name: string;                        // "Bash", "Read", "Edit", "Task", etc.
+  input: Record<string, unknown>;      // Tool-specific input (command, filePath, etc.)
+  isTask: boolean;                     // true if this is a Task (subagent) call
+  taskDescription?: string;            // Task description (for Task calls)
+  taskSubagentType?: string;           // Subagent type (for Task calls)
+}
+
+// Tool result from user messages (internal/meta)
+export interface ToolResult {
+  toolUseId: string;                   // Matches ToolCall.id
+  content: string | ContentBlock[];    // Tool output
+  isError?: boolean;                   // Failed tool call?
+}
+
+// Matched tool execution (call + result + timing)
+export interface ToolExecution {
+  toolCall: ToolCall;
+  result?: ToolResult;
+  startTime: Date;
+  endTime?: Date;
+  durationMs?: number;
+}
+```
+
+### 2.4 Turn Data (from SQLite `turns` table + JSONL messages)
 
 ```typescript
 // Matches session-report.md Section 3.3.2 (turns table schema)
@@ -30,107 +125,109 @@ export interface Turn {
   tokenUsage: TokenUsage;       // From turns table (cache_read_tokens, etc.)
   toolName?: string;            // From turns table (tool_name column)
   cwd?: string;                // From turns table (working directory)
-  messages: Message[];         // From JSONL (assistant/user messages)
+  messages: ParsedMessage[];   // From JSONL (matched messages)
   toolCalls: ToolCall[];       // Extracted from JSONL tool_use/tool_result
+  toolExecutions: ToolExecution[]; // Matched call+result pairs
   
   // Cache tier tracking per turn
   cacheWriteType: '5m' | '1h' | 'none';  // Which tier was WRITTEN this turn
   cacheReadType: '5m' | '1h' | 'unknown';  // Which tier was READ (inferred)
   cacheCreationTokensThisTurn: number;  // Tokens written this specific turn
+  
+  // Conversation grouping
+  conversationGroup?: ConversationGroup; // User message + AI responses
 }
 ```
 
-### 2.3 JSONL Message Types (from `session.jsonl`)
+### 2.5 Conversation Group (user message + AI responses)
+
+Inspired by claude-devtools' `ConversationGroupBuilder`. Groups one user message with all AI responses until the next user message.
 
 ```typescript
-// Matches session-report.md Section 3.3.4 (JSONL structure)
-export type MessageContent = TextContent | ToolUseContent | ToolResultContent;
-
-export interface Message {
-  type: 'assistant' | 'user' | 'system';
-  timestamp?: string;           // From JSONL top-level timestamp
-  content: MessageContent[];    // Array of content blocks
+// One user message + all AI responses until next user message
+export interface ConversationGroup {
+  id: string;                          // e.g., "group-1"
+  userMessage: ParsedMessage;          // The user message that started this group
+  aiResponses: ParsedMessage[];        // All AI responses until next user message
+  subagents: Subagent[];               // Subagents spawned in this group
+  toolExecutions: ToolExecution[];     // Regular tool executions
+  taskExecutions: TaskExecution[];     // Task (subagent) executions
+  startTime: Date;
+  endTime: Date;
+  durationMs: number;
+  metrics: GroupMetrics;
 }
 
-export interface TextContent {
-  type: 'text';
-  text: string;
+// Task execution (links Task call to subagent)
+export interface TaskExecution {
+  taskCall: ToolCall;
+  taskCallTimestamp: Date;
+  subagent: Subagent;
+  toolResult: ParsedMessage;
+  resultTimestamp: Date;
+  durationMs: number;
 }
 
-export interface ToolUseContent {
-  type: 'tool_use';
-  name: string;                 // e.g., "Bash", "Read", "AskUserQuestion"
-  input: Record<string, any>;   // tool-specific: command, filePath, description
-  toolUseId: string;            // Links to ToolResultContent
-}
-
-export interface ToolResultContent {
-  type: 'tool_result';
-  toolUseId: string;            // Matches ToolUseContent.toolUseId
-  content: string;              // Success output or error message
-  isError?: boolean;            // True if tool failed (Section 2.3.1)
+export interface GroupMetrics {
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheCreationTokens: number;
+  messageCount: number;
 }
 ```
 
-### 2.4 Raw JSONL Record (before normalization)
+### 2.6 Subagent (Task/subagent resolution)
+
+Inspired by claude-devtools' `SubagentResolver`. Handles both NEW and OLD subagent directory structures.
 
 ```typescript
-// Raw record from session.jsonl line — contains usage.cache_creation fields
-// This is the INTERNAL type used by jsonl-parser.ts, NOT exported to consumers
-interface RawJsonlRecord {
-  type: string;               // "assistant", "user", "system", etc.
-  timestamp?: string;           // Top-level timestamp
-  uuid?: string;               // Message UUID (for matching)
-  parentUuid?: string;         // Parent message UUID
-  message?: {
-    role: string;
-    content: any[];              // Raw content array (may include usage, etc.)
-    model?: string;              // Model used (e.g., "claude-sonnet-4-6")
-    usage?: {
-      input_tokens: number;
-      output_tokens: number;
-      cache_read_input_tokens: number;
-      cache_creation_input_tokens: number;
-      cache_creation?: {
-        ephemeral_5m_input_tokens: number;
-        ephemeral_1h_input_tokens: number;
-      };
-      // ... other usage fields
-    };
+// Resolved subagent process
+export interface Subagent {
+  id: string;                          // Agent ID (from filename: agent-{id}.jsonl)
+  filePath: string;                    // Path to subagent JSONL file
+  messages: ParsedMessage[];           // Parsed messages from subagent file
+  
+  // Timing
+  startTime: Date;
+  endTime: Date;
+  durationMs: number;
+  
+  // Metrics
+  metrics: SubagentMetrics;
+  
+  // Linking
+  parentTaskId?: string;               // ID of Task tool call that spawned this
+  description?: string;                // Task description
+  subagentType?: string;               // Subagent type (Explore, etc.)
+  
+  // Parallelism
+  isParallel: boolean;                 // true if running in parallel with other subagents
+  isOngoing: boolean;                  // true if still running
+  
+  // Team metadata (for team spawns)
+  team?: {
+    teamName: string;
+    memberName: string;
+    memberColor: string;
   };
-  // For user messages with tool results:
-  toolUseResult?: {
-    toolUseId: string;
-    content: string;
-    isError?: boolean;
-  };
+}
+
+export interface SubagentMetrics {
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheCreationTokens: number;
+  messageCount: number;
+  durationMs: number;
 }
 ```
 
-**Normalized types (exported to consumers):**
-
-### 2.5 Tool Call (extracted from JSONL tool_use + tool_result pairs)
-
-```typescript
-// Matches session-report.md Section 4.2 (Tool Used, Exact Command, Tool Result)
-export interface ToolCall {
-  toolUseId: string;
-  name: string;                 // "Bash", "Read", "Edit", etc.
-  input: Record<string, any>;    // command, filePath, description, etc.
-  result?: string;               // Output from tool execution
-  isError?: boolean;             // Failed tool call?
-  timestamp?: string;            // From parent message
-}
-```
-
-### 2.5 Session Metadata (from SQLite `sessions` + `turns` tables)
+### 2.7 Session Metadata (from SQLite `sessions` + `turns` tables)
 
 ```typescript
 // Matches session-report.md Section 4.1 (Session Overview table)
 // NOTE: model comes from turns table (sessions table does NOT have model column)
-// getSession() queries: 
-//   1. SELECT * FROM sessions WHERE session_id = ?
-//   2. SELECT model FROM turns WHERE session_id = ? LIMIT 1 (get model from first turn)
 export interface SessionMetadata {
   sessionId: string;            // From sessions.session_id
   projectName: string;           // From sessions.project_name
@@ -141,10 +238,27 @@ export interface SessionMetadata {
   totalTokens: TokenUsage;        // From sessions.total_* columns
   startTime: string;             // First turn timestamp
   endTime: string;               // Last turn timestamp
+  
+  // Session state
+  isOngoing: boolean;            // true if session is still active
+  gitBranch?: string;            // Git branch from JSONL
+  
+  // Context consumption (across compaction phases)
+  contextConsumption?: number;   // Total tokens used across all phases
+  compactionCount?: number;      // Number of compaction events
+  phaseBreakdown?: PhaseTokenBreakdown[]; // Per-phase token contribution
+}
+
+// Per-phase token breakdown (for compaction tracking)
+export interface PhaseTokenBreakdown {
+  phaseNumber: number;
+  contribution: number;          // Tokens added in this phase
+  peakTokens: number;            // Peak tokens before compaction
+  postCompaction?: number;       // Tokens after compaction
 }
 ```
 
-### 2.6 Pricing Types
+### 2.8 Pricing Types
 
 ```typescript
 // Matches Anthropic pricing docs: 5m = 1.25x input, 1h = 2x input
@@ -164,8 +278,6 @@ export interface TurnPricing {
   inputCost: number;
   outputCost: number;
   cacheReadCost: number;
-  
-  // Separate costs for each cache tier
   cacheCreation5mCost: number;
   cacheCreation1hCost: number;
   totalCost: number;
@@ -174,29 +286,31 @@ export interface TurnPricing {
 // Full session pricing summary
 export interface SessionPricing {
   totalCost: number;
-  turnsPricing: TurnPricing[];   // Per-turn cost breakdown
-  pricingRate: PricingRate;       // Model-specific rates used
+  turnsPricing: TurnPricing[];
+  pricingRate: PricingRate;
 }
 ```
 
-### 2.7 Full Timeline Output (merged JSON)
+### 2.9 Full Timeline Output (merged JSON)
 
 ```typescript
-// Final output of the extractor (matches session-report.md Appendix B.9)
+// Final output of the extractor
 export interface FullTimelineSession {
   session: SessionMetadata;
   turns: Turn[];
+  subagents: Subagent[];           // All resolved subagents
+  conversationGroups: ConversationGroup[]; // Grouped by user message
   pricing: SessionPricing;
 }
 ```
 
-### Key References to `session-report.md`:
-- Token types: Section 2.1, 2.2
-- SQLite schemas: Section 3.3.2 (turns table), 3.3.1 (sessions table)
-- JSONL structure: Section 3.3.4
-- Turn-by-turn example: Section 4.2 (Turn 1–Turn 28 fields)
-- Pricing rates: Section 2.1, Appendix B.3
-- Output format: Appendix B.9 (JSON export)
+### Key References:
+- Token types: `session-report.md` Section 2.1, 2.2
+- SQLite schemas: `session-report.md` Section 3.3.2 (turns table), 3.3.1 (sessions table)
+- JSONL structure: `session-report.md` Section 3.3.4
+- ParsedMessage fields: [claude-devtools types](https://github.com/matt1398/claude-devtools/blob/main/src/main/types/)
+- Subagent resolution: [claude-devtools SubagentResolver](https://github.com/matt1398/claude-devtools/blob/main/src/main/services/discovery/SubagentResolver.ts)
+- Conversation grouping: [claude-devtools ConversationGroupBuilder](https://github.com/matt1398/claude-devtools/blob/main/src/main/services/analysis/ConversationGroupBuilder.ts)
 
 ---
 
