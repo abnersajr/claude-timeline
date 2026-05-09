@@ -4,7 +4,9 @@
 
 **Goal:** Build a standalone TypeScript data extractor that merges SQLite (usage.db) and JSONL (session.jsonl) into a unified JSON timeline for a single Claude Code session.
 
-**Architecture:** Modular package (Approach2) with clear separation: types → utils → db-reader → jsonl-parser → merger → pricing → index.
+**Architecture:** Modular package (Approach 2) with clear separation: types → utils → db-reader → noise-filter → jsonl-parser → tool-matcher → subagent-resolver → merger → pricing → index.
+
+**Inspired by:** [claude-devtools](https://github.com/matt1398/claude-devtools) — streaming parsing, noise filtering, subagent resolution, tool matching.
 
 **Tech Stack:** TypeScript, Node.js (no Bun), Biome (no ESLint/Prettier), vitest (testing), better-sqlite3 (SQLite).
 
@@ -25,27 +27,33 @@
 
 ```json
 {
-  "name": "claude-session-extracter",
+  "name": "@timeline/extractor",
   "version": "0.1.0",
   "description": "Claude Code session timeline extractor",
-  "main": "dist/index.js",
+  "type": "module",
+  "main": "./src/index.ts",
+  "engines": {
+    "node": ">=24.15.0",
+    "pnpm": ">=11.0.0"
+  },
   "scripts": {
-    "build": "tsc",
-    "dev": "tsx src/index.ts",
+    "extract": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit",
     "test": "vitest",
     "lint": "biome check",
     "format": "biome format"
   },
   "dependencies": {
-    "better-sqlite3": "^9.4.3",
+    "better-sqlite3": "^11.7.0",
     "minimist": "^1.2.8"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
     "@types/minimist": "^1.2.5",
-    "@types/node": "^22.0.0",
+    "@types/node": "^22.10.5",
     "biome": "^1.9.0",
-    "tsx": "^4.19.0",
-    "typescript": "^5.6.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3",
     "vitest": "^2.1.0"
   }
 }
@@ -57,7 +65,8 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "module": "commonjs",
+    "module": "ES2022",
+    "moduleResolution": "bundler",
     "lib": ["ES2022"],
     "outDir": "./dist",
     "rootDir": "./src",
@@ -135,7 +144,7 @@ dist/
 
 - [ ] **Step 6: Install dependencies**
 
-Run: `npm install`
+Run: `pnpm install`
 Expected: All dependencies installed, no errors.
 
 - [ ] **Step 7: Commit**
@@ -157,17 +166,19 @@ git commit -m "chore: init project with TypeScript, Biome, vitest"
 
 ```typescript
 // tests/types.test.ts
+import { describe, it, expect } from 'vitest';
 import type {
   TokenUsage,
-  Turn,
-  Message,
+  ParsedMessage,
   ToolCall,
+  ToolResult,
+  ToolExecution,
+  Turn,
+  ConversationGroup,
+  Subagent,
   SessionMetadata,
   PricingRate,
-  TurnPricing,
-  SessionPricing,
   FullTimelineSession,
-  RawJsonlRecord,
 } from '../src/types';
 
 describe('types', () => {
@@ -183,18 +194,55 @@ describe('types', () => {
     expect(usage.inputTokens).toBe(100);
   });
 
-  it('should define Turn with cache types', () => {
-    const turn: Turn = {
-      timestamp: '2026-05-07T19:22:45.118Z',
-      tokenUsage: {} as TokenUsage,
-      toolName: 'Bash',
-      messages: [],
+  it('should define ParsedMessage with all metadata fields', () => {
+    const msg: ParsedMessage = {
+      uuid: 'test-uuid',
+      parentUuid: null,
+      type: 'assistant',
+      role: 'assistant',
+      content: [{ type: 'text', text: 'Hello' }],
+      timestamp: new Date(),
+      isSidechain: false,
+      isMeta: false,
+      isCompactSummary: false,
       toolCalls: [],
-      cacheWriteType: '5m',
-      cacheReadType: '5m',
-      cacheCreationTokensThisTurn: 410,
+      toolResults: [],
     };
-    expect(turn.cacheWriteType).toBe('5m');
+    expect(msg.uuid).toBe('test-uuid');
+    expect(msg.isSidechain).toBe(false);
+  });
+
+  it('should define ToolCall with isTask flag', () => {
+    const tc: ToolCall = {
+      id: 'tool-1',
+      name: 'Task',
+      input: { description: 'Explore codebase' },
+      isTask: true,
+      taskDescription: 'Explore codebase',
+    };
+    expect(tc.isTask).toBe(true);
+  });
+
+  it('should define Subagent with all fields', () => {
+    const sub: Subagent = {
+      id: 'agent-1',
+      filePath: '/path/to/agent-1.jsonl',
+      messages: [],
+      startTime: new Date(),
+      endTime: new Date(),
+      durationMs: 1000,
+      metrics: {
+        inputTokens: 100,
+        outputTokens: 200,
+        cacheReadTokens: 300,
+        cacheCreationTokens: 400,
+        messageCount: 5,
+        durationMs: 1000,
+      },
+      isParallel: false,
+      isOngoing: false,
+    };
+    expect(sub.id).toBe('agent-1');
   });
 });
 ```
@@ -206,137 +254,18 @@ Expected: FAIL with "Cannot find module '../src/types'"
 
 - [ ] **Step 3: Write minimal implementation**
 
-```typescript
-// src/types.ts
-// Matches session-report.md Section 2.1 (Token Types table)
-export interface TokenUsage {
-  inputTokens: number;
-  outputTokens: number;
-  cacheReadTokens: number;
-  cacheCreation5mTokens: number;
-  cacheCreation1hTokens: number;
-  cacheCreationTokens?: number; // Fallback total
-}
-
-// Raw JSONL record (internal, not exported to consumers)
-// NOTE: This is the INTERNAL type used by jsonl-parser.ts
-export interface RawJsonlRecord {
-  type: string;
-  timestamp?: string;
-  uuid?: string;
-  parentUuid?: string;
-  message?: {
-    role: string;
-    content: any[];
-    model?: string;
-    usage?: {
-      input_tokens: number;
-      output_tokens: number;
-      cache_read_input_tokens: number;
-      cache_creation_input_tokens: number;
-      cache_creation?: {
-        ephemeral_5m_input_tokens: number;
-        ephemeral_1h_input_tokens: number;
-      };
-    };
-  };
-  toolUseResult?: {
-    toolUseId: string;
-    content: string;
-    isError?: boolean;
-  };
-}
-
-export type MessageContent = TextContent | ToolUseContent | ToolResultContent;
-
-export interface Message {
-  type: 'assistant' | 'user' | 'system';
-  timestamp?: string;
-  content: MessageContent[];
-}
-
-export interface TextContent {
-  type: 'text';
-  text: string;
-}
-
-export interface ToolUseContent {
-  type: 'tool_use';
-  name: string;
-  input: Record<string, any>;
-  toolUseId: string;
-}
-
-export interface ToolResultContent {
-  type: 'tool_result';
-  toolUseId: string;
-  content: string;
-  isError?: boolean;
-}
-
-export interface ToolCall {
-  toolUseId: string;
-  name: string;
-  input: Record<string, any>;
-  result?: string;
-  isError?: boolean;
-  timestamp?: string;
-}
-
-export interface Turn {
-  timestamp: string;
-  tokenUsage: TokenUsage;
-  toolName?: string;
-  cwd?: string;
-  messages: Message[];
-  toolCalls: ToolCall[];
-  cacheWriteType: '5m' | '1h' | 'none';
-  cacheReadType: '5m' | '1h' | '5m-fallback' | 'unknown';
-  cacheCreationTokensThisTurn: number;
-}
-
-export interface SessionMetadata {
-  sessionId: string;
-  projectName: string;
-  model: string;
-  commandExecuted?: string;
-  workingDirectory: string;
-  turnCount: number;
-  totalTokens: TokenUsage;
-  startTime: string;
-  endTime: string;
-}
-
-export interface PricingRate {
-  model: string;
-  inputPerMTok: number;
-  outputPerMTok: number;
-  cacheReadPerMTok: number;
-  cacheCreation5mPerMTok: number;
-  cacheCreation1hPerMTok: number;
-}
-
-export interface TurnPricing {
-  inputCost: number;
-  outputCost: number;
-  cacheReadCost: number;
-  cacheCreation5mCost: number;
-  cacheCreation1hCost: number;
-  totalCost: number;
-}
-
-export interface SessionPricing {
-  totalCost: number;
-  turnsPricing: TurnPricing[];
-  pricingRate: PricingRate;
-}
-
-export interface FullTimelineSession {
-  session: SessionMetadata;
-  turns: Turn[];
-  pricing: SessionPricing;
-}
-```
+See `2026-05-08-session-extractor-types.md` for complete type definitions. Key types:
+- `TokenUsage` — per-turn/session token counts
+- `ParsedMessage` — complete JSONL entry with all metadata (uuid, parentUuid, isSidechain, isMeta, sourceToolUseID, agentId, requestId, etc.)
+- `ToolCall` — tool invocation with isTask flag
+- `ToolResult` — tool result with toolUseId
+- `ToolExecution` — matched call+result pair with timing
+- `Turn` — SQLite turn + matched messages + tool executions + conversation group
+- `ConversationGroup` — user message + AI responses + subagents
+- `Subagent` — resolved subagent with metrics and linking
+- `SessionMetadata` — session info + ongoing status + context consumption
+- `PricingRate`, `TurnPricing`, `SessionPricing` — pricing types
+- `FullTimelineSession` — final output with session, turns, subagents, groups, pricing
 
 - [ ] **Step 4: Run test to verify it passes**
 
@@ -347,7 +276,7 @@ Expected: PASS
 
 ```bash
 git add src/types.ts tests/types.test.ts
-git commit -m "feat: add TypeScript interfaces for session extractor"
+git commit -m "feat: add complete TypeScript interfaces for session extractor"
 ```
 
 ---
@@ -367,15 +296,14 @@ git commit -m "feat: add TypeScript interfaces for session extractor"
 import { describe, it, beforeEach, afterEach } from 'vitest';
 import { open } from 'better-sqlite3';
 import { getSession, getTurns, getModelForSession } from '../src/db-reader';
-import { SessionMetadata } from '../src/types';
 import * as os from 'os';
 import * as path from 'path';
+import * as fs from 'fs';
 
 describe('db-reader', () => {
   const testDbPath = path.join(os.tmpdir(), 'test-usage.db');
   
   beforeEach(() => {
-    // Create in-memory DB with test data
     const db = open(testDbPath);
     db.exec(`
       CREATE TABLE sessions (
@@ -409,7 +337,7 @@ describe('db-reader', () => {
   });
 
   afterEach(() => {
-    require('fs').unlinkSync(testDbPath);
+    fs.unlinkSync(testDbPath);
   });
 
   it('should get session by id', () => {
@@ -437,114 +365,10 @@ Expected: FAIL with "Cannot find module '../src/db-reader'"
 
 - [ ] **Step 3: Write minimal implementation**
 
-```typescript
-// src/db-reader.ts
-import { open, Database } from 'better-sqlite3';
-import { SessionMetadata, Turn, TokenUsage } from './types';
-
-class DbOpenError extends Error {
-  code = 3;
-  constructor(message: string) {
-    super(message);
-  }
-}
-
-class SessionNotFoundError extends Error {
-  code = 2;
-  constructor(sessionId: string) {
-    super(`Session not found: ${sessionId}`);
-  }
-}
-
-export function getSession(dbPath: string, sessionId: string): SessionMetadata {
-  let db: Database;
-  try {
-    db = open(dbPath);
-  } catch (err: any) {
-    throw new DbOpenError(`Failed to open SQLite DB: ${dbPath} - ${err.message}`);
-  }
-
-  try {
-    const row = db.prepare('SELECT * FROM sessions WHERE session_id = ?').get(sessionId) as any;
-    if (!row) {
-      throw new SessionNotFoundError(sessionId);
-    }
-
-    // Get model from first turn
-    const modelRow = db.prepare('SELECT model FROM turns WHERE session_id = ? ORDER BY timestamp ASC LIMIT 1').get(sessionId) as any;
-
-    return {
-      sessionId: row.session_id,
-      projectName: row.project_name,
-      model: modelRow?.model || 'claude-sonnet-4-6',
-      commandExecuted: undefined,
-      workingDirectory: row.project_name,
-      turnCount: row.turn_count,
-      totalTokens: {
-        inputTokens: row.total_input_tokens,
-        outputTokens: row.total_output_tokens,
-        cacheReadTokens: row.total_cache_read,
-        cacheCreation5mTokens: 0,
-        cacheCreation1hTokens: 0,
-        cacheCreationTokens: row.total_cache_creation,
-      },
-      startTime: row.last_timestamp,
-      endTime: row.last_timestamp,
-    };
-  } finally {
-    db?.close();
-  }
-}
-
-export function getTurns(dbPath: string, sessionId: string): Turn[] {
-  let db: Database;
-  try {
-    db = open(dbPath);
-  } catch (err: any) {
-    throw new DbOpenError(`Failed to open SQLite DB: ${dbPath} - ${err.message}`);
-  }
-
-  try {
-    const rows = db.prepare('SELECT * FROM turns WHERE session_id = ? ORDER BY timestamp ASC').all(sessionId) as any[];
-    return rows.map(row => ({
-      timestamp: row.timestamp,
-      tokenUsage: {
-        inputTokens: row.input_tokens,
-        outputTokens: row.output_tokens,
-        cacheReadTokens: row.cache_read_tokens,
-        cacheCreation5mTokens: 0,
-        cacheCreation1hTokens: 0,
-        cacheCreationTokens: row.cache_creation_tokens,
-      },
-      toolName: row.tool_name,
-      cwd: row.cwd,
-      messages: [],
-      toolCalls: [],
-      cacheWriteType: 'none' as const,
-      cacheReadType: 'unknown' as const,
-      cacheCreationTokensThisTurn: row.cache_creation_tokens,
-    }));
-  } finally {
-    db?.close();
-  }
-}
-
-export function getModelForSession(dbPath: string, sessionId: string): string {
-  let db: Database;
-  try {
-    db = open(dbPath);
-  } catch (err: any) {
-    return 'claude-sonnet-4-6'; // Fallback
-  }
-
-  try {
-    const row = db.prepare('SELECT model FROM turns WHERE session_id = ? ORDER BY timestamp ASC LIMIT 1').get(sessionId) as any;
-    return row?.model || 'claude-sonnet-4-6';
-  } finally {
-    db?.close();
-  }
-}
-```
+See implementation plan for `db-reader.ts`. Key functions:
+- `getSession(dbPath, sessionId)` → SessionMetadata (throws on not found)
+- `getTurns(dbPath, sessionId)` → Turn[] (empty array if none)
+- `getModelForSession(dbPath, sessionId)` → string (fallback to 'claude-sonnet-4-6')
 
 - [ ] **Step 4: Run tests to verify they pass**
 
@@ -608,7 +432,6 @@ describe('utils', () => {
     );
     expect(result).toBe(jsonlPath);
 
-    // Cleanup
     fs.rmSync(tmpDir, { recursive: true });
   });
 });
@@ -621,49 +444,11 @@ Expected: FAIL with "Cannot find module '../src/utils'"
 
 - [ ] **Step 3: Write minimal implementation**
 
-```typescript
-// src/utils.ts
-import * as path from 'path';
-import * as os from 'os';
-import * as fs from 'fs';
-
-export function getDbPath(customPath?: string): string {
-  if (customPath) return customPath;
-  if (process.env.CLAUDE_CONFIG_DIR) {
-    return path.join(process.env.CLAUDE_CONFIG_DIR, 'usage.db');
-  }
-  return path.join(os.homedir(), '.claude', 'usage.db');
-}
-
-export function getProjectsDir(customPath?: string): string {
-  if (customPath) return customPath;
-  if (process.env.CLAUDE_CONFIG_DIR) {
-    return path.join(process.env.CLAUDE_CONFIG_DIR, 'projects');
-  }
-  return path.join(os.homedir(), '.claude', 'projects');
-}
-
-export function encodeProjectName(projectName: string): string {
-  return projectName.replace(/\//g, '-');
-}
-
-export function resolveSessionJsonlPath(
-  session: { projectName: string; sessionId: string },
-  projectsDir: string
-): string | null {
-  // Primary: projectName with "/" → "-"
-  const encoded = encodeProjectName(session.projectName);
-  const primaryPath = path.join(projectsDir, encoded, `${session.sessionId}.jsonl`);
-  if (fs.existsSync(primaryPath)) return primaryPath;
-
-  // Fallback: URL-encoded
-  const urlEncoded = encodeURIComponent(session.projectName);
-  const urlPath = path.join(projectsDir, urlEncoded, `${session.sessionId}.jsonl`);
-  if (fs.existsSync(urlPath)) return urlPath;
-
-  return null;
-}
-```
+See implementation plan for `utils.ts`. Key functions:
+- `getDbPath(customPath?)` — respects CLAUDE_CONFIG_DIR
+- `getProjectsDir(customPath?)` — respects CLAUDE_CONFIG_DIR
+- `encodeProjectName(projectName)` — "/" → "-"
+- `resolveSessionJsonlPath(session, projectsDir)` — primary + URL-encoded fallback
 
 - [ ] **Step 4: Run tests to verify they pass**
 
@@ -679,9 +464,124 @@ git commit -m "feat: add utils for path resolution and project name encoding"
 
 ---
 
-## Chunk 3: JSONL Parser & Merger (Tasks 5–6)
+## Chunk 3: Noise Filter & JSONL Parser (Tasks 5–6)
 
-### Task 5: Implement JSONL Parser
+### Task 5: Implement Noise Filter
+
+**Files:**
+- Create: `src/noise-filter.ts`
+- Test: `tests/noise-filter.test.ts`
+
+- [ ] **Step 1: Write failing tests**
+
+```typescript
+// tests/noise-filter.test.ts
+import { describe, it, expect } from 'vitest';
+import { isDisplayableEntry, classifyMessage } from '../src/noise-filter';
+
+describe('noise-filter', () => {
+  it('should filter out system entries', () => {
+    expect(isDisplayableEntry({ type: 'system', uuid: '1' })).toBe(false);
+  });
+
+  it('should filter out summary entries', () => {
+    expect(isDisplayableEntry({ type: 'summary', uuid: '1' })).toBe(false);
+  });
+
+  it('should filter out file-history-snapshot entries', () => {
+    expect(isDisplayableEntry({ type: 'file-history-snapshot', uuid: '1' })).toBe(false);
+  });
+
+  it('should filter out queue-operation entries', () => {
+    expect(isDisplayableEntry({ type: 'queue-operation', uuid: '1' })).toBe(false);
+  });
+
+  it('should filter out synthetic assistant messages', () => {
+    expect(isDisplayableEntry({
+      type: 'assistant',
+      uuid: '1',
+      message: { model: '<synthetic>', content: [] }
+    })).toBe(false);
+  });
+
+  it('should filter out sidechain messages', () => {
+    expect(isDisplayableEntry({
+      type: 'assistant',
+      uuid: '1',
+      isSidechain: true,
+      message: { content: [] }
+    })).toBe(false);
+  });
+
+  it('should keep real assistant messages', () => {
+    expect(isDisplayableEntry({
+      type: 'assistant',
+      uuid: '1',
+      message: { content: [{ type: 'text', text: 'Hello' }] }
+    })).toBe(true);
+  });
+
+  it('should keep real user messages', () => {
+    expect(isDisplayableEntry({
+      type: 'user',
+      uuid: '1',
+      message: { content: 'Hello' }
+    })).toBe(true);
+  });
+
+  it('should filter out hard noise tags', () => {
+    expect(isDisplayableEntry({
+      type: 'user',
+      uuid: '1',
+      message: { content: '<local-command-caveat>test</local-command-caveat>' }
+    })).toBe(false);
+  });
+
+  it('should keep command output', () => {
+    expect(isDisplayableEntry({
+      type: 'user',
+      uuid: '1',
+      message: { content: '<local-command-stdout>output</local-command-stdout>' }
+    })).toBe(true);
+  });
+
+  it('should keep meta user messages (tool results)', () => {
+    expect(isDisplayableEntry({
+      type: 'user',
+      uuid: '1',
+      isMeta: true,
+      message: { content: [{ type: 'tool_result', tool_use_id: '1', content: 'ok' }] }
+    })).toBe(true);
+  });
+});
+```
+
+- [ ] **Step 2: Run tests to verify they fail**
+
+Run: `npx vitest run tests/noise-filter.test.ts`
+Expected: FAIL with "Cannot find module '../src/noise-filter'"
+
+- [ ] **Step 3: Write minimal implementation**
+
+See `2026-05-08-session-extractor-appendix.md` Section 5.6 for complete noise filtering rules. Key functions:
+- `isDisplayableEntry(entry)` — returns true if entry should be kept
+- `classifyMessage(msg)` — returns MessageCategory ('user' | 'system' | 'compact' | 'hardNoise' | 'ai')
+
+- [ ] **Step 4: Run tests to verify they pass**
+
+Run: `npx vitest run tests/noise-filter.test.ts`
+Expected: PASS
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/noise-filter.ts tests/noise-filter.test.ts
+git commit -m "feat: add noise filter for message classification"
+```
+
+---
+
+### Task 6: Implement Streaming JSONL Parser
 
 **Files:**
 - Create: `src/jsonl-parser.ts`
@@ -692,7 +592,7 @@ git commit -m "feat: add utils for path resolution and project name encoding"
 ```typescript
 // tests/jsonl-parser.test.ts
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { parseSessionJsonl } from '../src/jsonl-parser';
+import { parseSessionJsonl, deduplicateByRequestId } from '../src/jsonl-parser';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -710,35 +610,84 @@ describe('jsonl-parser', () => {
     fs.rmSync(tmpDir, { recursive: true });
   });
 
-  it('should parse valid JSONL', () => {
+  it('should parse valid JSONL with streaming', async () => {
     const content = [
-      JSON.stringify({ type: 'assistant', timestamp: '2026-05-07T19:22:45.118Z', message: { role: 'assistant', content: [{ type: 'text', text: 'Hello' }] } }),
-      JSON.stringify({ type: 'user', message: { role: 'user', content: [{ type: 'text', text: 'Hi' }] })
+      JSON.stringify({ type: 'assistant', uuid: '1', timestamp: '2026-05-07T19:22:45.118Z', message: { role: 'assistant', content: [{ type: 'text', text: 'Hello' }] } }),
+      JSON.stringify({ type: 'user', uuid: '2', timestamp: '2026-05-07T19:22:46.118Z', message: { role: 'user', content: 'Hi' } })
     ].join('\n');
     fs.writeFileSync(jsonlPath, content);
 
-    const result = parseSessionJsonl(jsonlPath, 'session-1');
-    expect(result.rawMessages.length).toBe(2);
-    expect(result.toolCalls.length).toBe(0);
-    expect(result.malformedCount).toBe(0);
+    const result = await parseSessionJsonl(jsonlPath);
+    expect(result.length).toBe(2);
+    expect(result[0].uuid).toBe('1');
   });
 
-  it('should skip malformed lines', () => {
+  it('should skip malformed lines', async () => {
     const content = [
-      JSON.stringify({ type: 'assistant' }),
+      JSON.stringify({ type: 'assistant', uuid: '1', message: { content: [] } }),
       'not-json',
-      JSON.stringify({ type: 'user' })
+      JSON.stringify({ type: 'user', uuid: '2', message: { content: 'Hi' } })
     ].join('\n');
     fs.writeFileSync(jsonlPath, content);
 
-    const result = parseSessionJsonl(jsonlPath, 'session-1');
-    expect(result.rawMessages.length).toBe(2);
-    expect(result.malformedCount).toBe(1);
+    const result = await parseSessionJsonl(jsonlPath);
+    expect(result.length).toBe(2);
   });
 
-  it('should return null for missing file', () => {
-    const result = parseSessionJsonl('/non-existent.jsonl', 'session-1');
-    expect(result).toBeNull();
+  it('should return empty array for missing file', async () => {
+    const result = await parseSessionJsonl('/non-existent.jsonl');
+    expect(result.length).toBe(0);
+  });
+
+  it('should deduplicate by requestId', () => {
+    const messages = [
+      { uuid: '1', requestId: 'req-1', type: 'assistant', usage: { outputTokens: 100 } },
+      { uuid: '2', requestId: 'req-1', type: 'assistant', usage: { outputTokens: 200 } },
+      { uuid: '3', requestId: 'req-2', type: 'assistant', usage: { outputTokens: 300 } },
+      { uuid: '4', type: 'user', usage: undefined },
+    ] as any[];
+
+    const result = deduplicateByRequestId(messages);
+    expect(result.length).toBe(3);
+    expect(result[0].uuid).toBe('2'); // Last of req-1
+    expect(result[1].uuid).toBe('3'); // Only req-2
+    expect(result[2].uuid).toBe('4'); // No requestId, pass through
+  });
+
+  it('should extract all metadata fields', async () => {
+    const content = JSON.stringify({
+      type: 'assistant',
+      uuid: '1',
+      parentUuid: null,
+      timestamp: '2026-05-07T19:22:45.118Z',
+      isSidechain: false,
+      isMeta: false,
+      cwd: '/Users/test',
+      gitBranch: 'main',
+      agentId: 'agent-1',
+      requestId: 'req-1',
+      message: {
+        role: 'assistant',
+        model: 'claude-sonnet-4-6',
+        content: [{ type: 'text', text: 'Hello' }],
+        usage: {
+          input_tokens: 10,
+          output_tokens: 20,
+          cache_read_input_tokens: 30,
+          cache_creation_input_tokens: 40,
+        }
+      }
+    });
+    fs.writeFileSync(jsonlPath, content);
+
+    const result = await parseSessionJsonl(jsonlPath);
+    expect(result.length).toBe(1);
+    expect(result[0].uuid).toBe('1');
+    expect(result[0].cwd).toBe('/Users/test');
+    expect(result[0].gitBranch).toBe('main');
+    expect(result[0].agentId).toBe('agent-1');
+    expect(result[0].requestId).toBe('req-1');
+    expect(result[0].isSidechain).toBe(false);
   });
 });
 ```
@@ -750,67 +699,14 @@ Expected: FAIL with "Cannot find module '../src/jsonl-parser'"
 
 - [ ] **Step 3: Write minimal implementation**
 
-```typescript
-// src/jsonl-parser.ts
-import * as fs from 'fs';
-import { RawJsonlRecord, ToolCall } from './types';
-
-export interface JsonlParseResult {
-  rawMessages: RawJsonlRecord[];
-  toolCalls: ToolCall[];
-  malformedCount: number;
-}
-
-export function parseSessionJsonl(
-  jsonlPath: string | null,
-  sessionId: string
-): JsonlParseResult | null {
-  if (!jsonlPath || !fs.existsSync(jsonlPath)) {
-    return null;
-  }
-
-  const content = fs.readFileSync(jsonlPath, 'utf-8');
-  const lines = content.split('\n').filter(Boolean);
-  
-  const rawMessages: RawJsonlRecord[] = [];
-  const toolCalls: ToolCall[] = [];
-  let malformedCount = 0;
-
-  for (const line of lines) {
-    try {
-      const obj = JSON.parse(line);
-      if (obj.type === 'assistant' || obj.type === 'user') {
-        rawMessages.push(obj as RawJsonlRecord);
-      }
-      // Extract tool calls from assistant messages
-      if (obj.message?.content) {
-        for (const item of obj.message.content) {
-          if (item.type === 'tool_use') {
-            toolCalls.push({
-              toolUseId: item.toolUseId,
-              name: item.name,
-              input: item.input,
-              timestamp: obj.timestamp,
-            });
-          }
-        }
-      }
-      // Extract tool results from user messages
-      if (obj.toolUseResult) {
-        const existing = toolCalls.find(tc => tc.toolUseId === obj.toolUseResult.toolUseId);
-        if (existing) {
-          existing.result = obj.toolUseResult.content;
-          existing.isError = obj.toolUseResult.isError;
-        }
-      }
-    } catch (err) {
-      malformedCount++;
-    }
-  }
-
-  return { rawMessages, toolCalls, malformedCount };
-}
-```
+Key implementation details:
+- Use `readline.createInterface` for streaming (not `fs.readFileSync`)
+- Extract ALL metadata fields: uuid, parentUuid, isSidechain, isMeta, isCompactSummary, sourceToolUseID, sourceToolAssistantUUID, agentId, requestId, cwd, gitBranch, userType, toolUseResult
+- Extract tool calls from content blocks (tool_use)
+- Extract tool results from content blocks (tool_result)
+- Parse usage → TokenUsage (with cache_creation breakdown)
+- Deduplicate by requestId (keep LAST entry per requestId)
+- Filter noise via noise-filter.ts
 
 - [ ] **Step 4: Run tests to verify they pass**
 
@@ -821,12 +717,207 @@ Expected: PASS
 
 ```bash
 git add src/jsonl-parser.ts tests/jsonl-parser.test.ts
-git commit -m "feat: add JSONL parser for session files"
+git commit -m "feat: add streaming JSONL parser with dedup and noise filter"
 ```
 
 ---
 
-### Task 6: Implement Merger
+## Chunk 4: Tool Matcher & Subagent Resolver (Tasks 7–8)
+
+### Task 7: Implement Tool Matcher
+
+**Files:**
+- Create: `src/tool-matcher.ts`
+- Test: `tests/tool-matcher.test.ts`
+
+- [ ] **Step 1: Write failing tests**
+
+```typescript
+// tests/tool-matcher.test.ts
+import { describe, it, expect } from 'vitest';
+import { buildToolExecutions } from '../src/tool-matcher';
+import type { ParsedMessage } from '../src/types';
+
+describe('tool-matcher', () => {
+  it('should match tool calls to results via sourceToolUseID', () => {
+    const messages: ParsedMessage[] = [
+      {
+        uuid: '1',
+        parentUuid: null,
+        type: 'assistant',
+        timestamp: new Date('2026-05-07T19:22:45.118Z'),
+        content: [{ type: 'tool_use', id: 'tool-1', name: 'Bash', input: { command: 'ls' } }],
+        isSidechain: false,
+        isMeta: false,
+        isCompactSummary: false,
+        toolCalls: [{ id: 'tool-1', name: 'Bash', input: { command: 'ls' }, isTask: false }],
+        toolResults: [],
+      },
+      {
+        uuid: '2',
+        parentUuid: null,
+        type: 'user',
+        timestamp: new Date('2026-05-07T19:22:46.118Z'),
+        content: [{ type: 'tool_result', tool_use_id: 'tool-1', content: 'file.txt' }],
+        isSidechain: false,
+        isMeta: true,
+        isCompactSummary: false,
+        sourceToolUseID: 'tool-1',
+        toolCalls: [],
+        toolResults: [{ toolUseId: 'tool-1', content: 'file.txt' }],
+      },
+    ];
+
+    const result = buildToolExecutions(messages);
+    expect(result.length).toBe(1);
+    expect(result[0].toolCall.id).toBe('tool-1');
+    expect(result[0].result?.toolUseId).toBe('tool-1');
+    expect(result[0].durationMs).toBeGreaterThan(0);
+  });
+
+  it('should handle calls without results', () => {
+    const messages: ParsedMessage[] = [
+      {
+        uuid: '1',
+        parentUuid: null,
+        type: 'assistant',
+        timestamp: new Date(),
+        content: [{ type: 'tool_use', id: 'tool-1', name: 'Bash', input: {} }],
+        isSidechain: false,
+        isMeta: false,
+        isCompactSummary: false,
+        toolCalls: [{ id: 'tool-1', name: 'Bash', input: {}, isTask: false }],
+        toolResults: [],
+      },
+    ];
+
+    const result = buildToolExecutions(messages);
+    expect(result.length).toBe(1);
+    expect(result[0].result).toBeUndefined();
+  });
+});
+```
+
+- [ ] **Step 2: Run tests to verify they fail**
+
+Run: `npx vitest run tests/tool-matcher.test.ts`
+Expected: FAIL with "Cannot find module '../src/tool-matcher'"
+
+- [ ] **Step 3: Write minimal implementation**
+
+Key implementation:
+- First pass: collect all tool calls from assistant messages
+- Second pass: match with results using sourceToolUseID (primary) + toolResults array (fallback)
+- Add calls without results (pending/failed)
+- Sort by startTime
+
+- [ ] **Step 4: Run tests to verify they pass**
+
+Run: `npx vitest run tests/tool-matcher.test.ts`
+Expected: PASS
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/tool-matcher.ts tests/tool-matcher.test.ts
+git commit -m "feat: add tool matcher with sourceToolUseID matching"
+```
+
+---
+
+### Task 8: Implement Subagent Resolver
+
+**Files:**
+- Create: `src/subagent-resolver.ts`
+- Test: `tests/subagent-resolver.test.ts`
+
+- [ ] **Step 1: Write failing tests**
+
+```typescript
+// tests/subagent-resolver.test.ts
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { resolveSubagents, discoverSubagentFiles } from '../src/subagent-resolver';
+import * as fs from 'fs';
+import * as path from 'path';
+import * as os from 'os';
+
+describe('subagent-resolver', () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'test-'));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true });
+  });
+
+  it('should discover subagent files in NEW structure', async () => {
+    const subagentsDir = path.join(tmpDir, 'session-1', 'subagents');
+    fs.mkdirSync(subagentsDir, { recursive: true });
+    fs.writeFileSync(path.join(subagentsDir, 'agent-abc.jsonl'), '{"uuid":"1","type":"user","message":{"content":"Warmup"}}');
+
+    const files = await discoverSubagentFiles(tmpDir, 'session-1');
+    expect(files.length).toBe(1);
+    expect(files[0]).toContain('agent-abc.jsonl');
+  });
+
+  it('should skip warmup subagents', async () => {
+    const subagentsDir = path.join(tmpDir, 'session-1', 'subagents');
+    fs.mkdirSync(subagentsDir, { recursive: true });
+    fs.writeFileSync(path.join(subagentsDir, 'agent-abc.jsonl'),
+      JSON.stringify({ uuid: '1', type: 'user', timestamp: '2026-05-07T19:22:45.118Z', message: { content: 'Warmup' } })
+    );
+
+    const result = await resolveSubagents(tmpDir, 'session-1', [], []);
+    expect(result.length).toBe(0);
+  });
+
+  it('should skip compact files', async () => {
+    const subagentsDir = path.join(tmpDir, 'session-1', 'subagents');
+    fs.mkdirSync(subagentsDir, { recursive: true });
+    fs.writeFileSync(path.join(subagentsDir, 'agent-acompact-abc.jsonl'), '{}');
+
+    const files = await discoverSubagentFiles(tmpDir, 'session-1');
+    // acompact files should be filtered
+    expect(files.filter(f => f.includes('acompact')).length).toBe(0);
+  });
+});
+```
+
+- [ ] **Step 2: Run tests to verify they fail**
+
+Run: `npx vitest run tests/subagent-resolver.test.ts`
+Expected: FAIL with "Cannot find module '../src/subagent-resolver'"
+
+- [ ] **Step 3: Write minimal implementation**
+
+Key implementation:
+- Discover subagent files from NEW + OLD structures
+- Parse each file (streaming readline)
+- Skip warmup subagents (first user message = "Warmup")
+- Skip compact files (agentId starts with 'acompact')
+- Link to Task calls via agentId from tool results
+- Detect parallel execution (100ms overlap window)
+- Propagate team metadata via parentUuid chain
+
+- [ ] **Step 4: Run tests to verify they pass**
+
+Run: `npx vitest run tests/subagent-resolver.test.ts`
+Expected: PASS
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/subagent-resolver.ts tests/subagent-resolver.test.ts
+git commit -m "feat: add subagent resolver with NEW/OLD structure support"
+```
+
+---
+
+## Chunk 5: Merger & Pricing (Tasks 9–10)
+
+### Task 9: Implement Merger (Orchestrator)
 
 **Files:**
 - Create: `src/merger.ts`
@@ -837,19 +928,39 @@ git commit -m "feat: add JSONL parser for session files"
 ```typescript
 // tests/merger.test.ts
 import { describe, it, expect } from 'vitest';
-import { extractFullTimeline } from '../src/merger';
-import { FullTimelineSession } from '../src/types';
+import {
+  extractFullTimeline,
+  buildConversationGroups,
+  trackContextConsumption,
+  checkSessionOngoing,
+  inferCacheReadType,
+  matchTurnsToMessages,
+} from '../src/merger';
 
 describe('merger', () => {
-  it('should merge session data', () => {
-    // Mock data - in practice, this would come from db-reader and jsonl-parser
-    const sessionId = 'test-session';
-    const dbPath = '/tmp/test.db';
-    const projectsDir = '/tmp/projects';
-
-    // This test would need mock implementations
-    // For now, just verify the function exists
+  it('should export extractFullTimeline', () => {
     expect(typeof extractFullTimeline).toBe('function');
+  });
+
+  it('should export buildConversationGroups', () => {
+    expect(typeof buildConversationGroups).toBe('function');
+  });
+
+  it('should export trackContextConsumption', () => {
+    expect(typeof trackContextConsumption).toBe('function');
+  });
+
+  it('should export checkSessionOngoing', () => {
+    expect(typeof checkSessionOngoing).toBe('function');
+  });
+
+  it('should infer cache read type', () => {
+    const turns = [
+      { timestamp: '2026-05-07T19:22:45.118Z', cacheWriteType: '5m' },
+      { timestamp: '2026-05-07T19:22:50.118Z', cacheWriteType: '5m' },
+    ] as any[];
+    const result = inferCacheReadType(1, turns, turns[1].timestamp);
+    expect(result).toBe('5m');
   });
 });
 ```
@@ -861,70 +972,13 @@ Expected: FAIL with "Cannot find module '../src/merger'"
 
 - [ ] **Step 3: Write minimal implementation**
 
-```typescript
-// src/merger.ts
-import { SessionMetadata, Turn, RawJsonlRecord, Message, ToolCall, FullTimelineSession, TurnPricing, SessionPricing } from './types';
-import { getSession, getTurns } from './db-reader';
-import { parseSessionJsonl, resolveSessionJsonlPath } from './jsonl-parser';
-import { calculateSessionCost } from './pricing';
-
-export function extractFullTimeline(
-  sessionId: string,
-  dbPath: string,
-  projectsDir: string
-): FullTimelineSession {
-  // 1. Get session + turns from SQLite
-  const session = getSession(dbPath, sessionId);
-  const turns = getTurns(dbPath, sessionId);
-
-  // 2. Find JSONL path
-  const jsonlPath = resolveSessionJsonlPath(session, projectsDir);
-
-  // 3. Parse JSONL
-  const jsonlResult = jsonlPath ? parseSessionJsonl(jsonlPath, sessionId) : null;
-  const rawMessages = jsonlResult?.rawMessages || [];
-  const toolCalls = jsonlResult?.toolCalls || [];
-
-  // 4. Match turns ↔ rawMessages (deterministic algorithm)
-  for (let i = 0; i < turns.length; i++) {
-    const turn = turns[i];
-    // Primary: timestamp match within 5 seconds
-    const turnTime = new Date(turn.timestamp).getTime();
-    const matches = rawMessages.filter(msg => {
-      if (!msg.timestamp) return false;
-      const msgTime = new Date(msg.timestamp).getTime();
-      return Math.abs(turnTime - msgTime) < 5000;
-    });
-
-    if (matches.length === 1) {
-      // Use it
-    } else if (matches.length > 1 && turn.hasOwnProperty('uuid')) {
-      // Use uuid match
-    } else {
-      // Fallback: index-based
-      if (rawMessages[i]) {
-        // Attach rawMessages[i] to turn
-      }
-    }
-  }
-
-  // 5. Normalize RawJsonlRecord → Message (simplified for now)
-  // TODO: Implement normalization
-
-  // 6. Infer cacheReadType per turn (simplified)
-  // TODO: Implement cache inference
-
-  // 7. Calculate pricing
-  const pricing = calculateSessionCost(session, turns);
-
-  // 8. Return FullTimelineSession
-  return {
-    session,
-    turns,
-    pricing,
-  };
-}
-```
+Key functions:
+- `extractFullTimeline(sessionId, dbPath, projectsDir)` — main orchestrator
+- `buildConversationGroups(messages, subagents)` — group user+AI responses
+- `trackContextConsumption(messages)` — track tokens across compaction phases
+- `checkSessionOngoing(messages)` — detect active sessions
+- `inferCacheReadType(turnIndex, turns, currentTurnTime)` — cache tier inference
+- `matchTurnsToMessages(turns, messages)` — deterministic turn matching
 
 - [ ] **Step 4: Run tests to verify they pass**
 
@@ -935,14 +989,12 @@ Expected: PASS
 
 ```bash
 git add src/merger.ts tests/merger.test.ts
-git commit -m "feat: add merger to combine SQLite and JSONL data"
+git commit -m "feat: add merger orchestrator with conversation grouping"
 ```
 
 ---
 
-## Chunk 4: Pricing & CLI (Tasks 7–8)
-
-### Task 7: Implement Pricing
+### Task 10: Implement Pricing
 
 **Files:**
 - Create: `src/pricing.ts`
@@ -954,7 +1006,7 @@ git commit -m "feat: add merger to combine SQLite and JSONL data"
 // tests/pricing.test.ts
 import { describe, it, expect } from 'vitest';
 import { getPricing, calculateSessionCost } from '../src/pricing';
-import { SessionMetadata, Turn } from '../src/types';
+import type { SessionMetadata, Turn } from '../src/types';
 
 describe('pricing', () => {
   it('should get pricing for known model', () => {
@@ -965,7 +1017,7 @@ describe('pricing', () => {
 
   it('should fallback for unknown model', () => {
     const rate = getPricing('unknown-model');
-    expect(rate.inputPerMTok).toBe(3.00); // Sonnet 4.6 fallback
+    expect(rate.inputPerMTok).toBe(3.00);
   });
 
   it('should calculate session cost', () => {
@@ -973,12 +1025,12 @@ describe('pricing', () => {
       sessionId: 'test',
       projectName: '/test',
       model: 'claude-sonnet-4-6',
-      commandExecuted: undefined,
       workingDirectory: '/test',
       turnCount: 1,
       totalTokens: {} as any,
       startTime: '2026-05-07T19:22:45.118Z',
       endTime: '2026-05-07T19:22:46.118Z',
+      isOngoing: false,
     };
     const turns: Turn[] = [{
       timestamp: '2026-05-07T19:22:45.118Z',
@@ -993,6 +1045,7 @@ describe('pricing', () => {
       toolName: 'Bash',
       messages: [],
       toolCalls: [],
+      toolExecutions: [],
       cacheWriteType: '1h',
       cacheReadType: '1h',
       cacheCreationTokensThisTurn: 12973,
@@ -1011,78 +1064,9 @@ Expected: FAIL with "Cannot find module '../src/pricing'"
 
 - [ ] **Step 3: Write minimal implementation**
 
-```typescript
-// src/pricing.ts
-import { SessionMetadata, Turn, TurnPricing, SessionPricing, PricingRate } from './types';
-
-const PRICING_TABLE: Record<string, PricingRate> = {
-  'claude-sonnet-4-6': {
-    model: 'claude-sonnet-4-6',
-    inputPerMTok: 3.00,
-    outputPerMTok: 15.00,
-    cacheReadPerMTok: 0.30,
-    cacheCreation5mPerMTok: 3.75,
-    cacheCreation1hPerMTok: 6.00,
-  },
-  'claude-sonnet-4': {
-    model: 'claude-sonnet-4',
-    inputPerMTok: 3.00,
-    outputPerMTok: 15.00,
-    cacheReadPerMTok: 0.30,
-    cacheCreation5mPerMTok: 3.75,
-    cacheCreation1hPerMTok: 6.00,
-  },
-  'claude-opus-4': {
-    model: 'claude-opus-4',
-    inputPerMTok: 5.00,
-    outputPerMTok: 25.00,
-    cacheReadPerMTok: 0.50,
-    cacheCreation5mPerMTok: 6.25,
-    cacheCreation1hPerMTok: 10.00,
-  },
-};
-
-export function getPricing(modelName: string): PricingRate {
-  const rate = PRICING_TABLE[modelName];
-  if (!rate) {
-    console.warn(`⚠️  Unknown model: "${modelName}". Using fallback pricing (Sonnet 4.6 rates).`);
-    return PRICING_TABLE['claude-sonnet-4-6'];
-  }
-  return rate;
-}
-
-export function calculateSessionCost(
-  session: SessionMetadata,
-  turns: Turn[]
-): SessionPricing {
-  const rate = getPricing(session.model);
-  const turnsPricing: TurnPricing[] = turns.map(turn => {
-    const inputCost = (turn.tokenUsage.inputTokens / 1_000_000) * rate.inputPerMTok;
-    const outputCost = (turn.tokenUsage.outputTokens / 1_000_000) * rate.outputPerMTok;
-    const cacheReadCost = (turn.tokenUsage.cacheReadTokens / 1_000_000) * rate.cacheReadPerMTok;
-    const cacheCreation5mCost = (turn.tokenUsage.cacheCreation5mTokens / 1_000_000) * rate.cacheCreation5mPerMTok;
-    const cacheCreation1hCost = (turn.tokenUsage.cacheCreation1hTokens / 1_000_000) * rate.cacheCreation1hPerMTok;
-    const totalCost = inputCost + outputCost + cacheReadCost + cacheCreation5mCost + cacheCreation1hCost;
-
-    return {
-      inputCost,
-      outputCost,
-      cacheReadCost,
-      cacheCreation5mCost,
-      cacheCreation1hCost,
-      totalCost,
-    };
-  });
-
-  const totalCost = turnsPricing.reduce((sum, tp) => sum + tp.totalCost, 0);
-
-  return {
-    totalCost,
-    turnsPricing,
-    pricingRate: rate,
-  };
-}
-```
+Key functions:
+- `getPricing(modelName)` — lookup with fallback to Sonnet 4.6
+- `calculateSessionCost(session, turns)` — per-turn cost calculation
 
 - [ ] **Step 4: Run tests to verify they pass**
 
@@ -1098,7 +1082,9 @@ git commit -m "feat: add pricing calculator with hardcoded model rates"
 
 ---
 
-### Task 8: Implement CLI Entry Point
+## Chunk 6: CLI Entry Point & Integration (Tasks 11–12)
+
+### Task 11: Implement CLI Entry Point
 
 **Files:**
 - Create: `src/index.ts`
@@ -1110,7 +1096,7 @@ git commit -m "feat: add pricing calculator with hardcoded model rates"
 // tests/index.test.ts
 import { describe, it, expect } from 'vitest';
 import { parseArgs, outputJSON } from '../src/index';
-import { FullTimelineSession } from '../src/types';
+import type { FullTimelineSession } from '../src/types';
 
 describe('index', () => {
   it('should parse args with session-id', () => {
@@ -1126,9 +1112,10 @@ describe('index', () => {
     const data: FullTimelineSession = {
       session: {} as any,
       turns: [],
+      subagents: [],
+      conversationGroups: [],
       pricing: {} as any,
     };
-    // Capture stdout
     const originalLog = console.log;
     let output = '';
     console.log = (msg: string) => { output = msg; };
@@ -1148,75 +1135,10 @@ Expected: FAIL with "Cannot find module '../src/index'"
 
 - [ ] **Step 3: Write minimal implementation**
 
-```typescript
-// src/index.ts
-import * as minimist from 'minimist';
-import * as path from 'path';
-import * as os from 'os';
-import * as fs from 'fs';
-import { FullTimelineSession } from './types';
-import { extractFullTimeline } from './merger';
-import { getDbPath, getProjectsDir } from './utils';
-
-export interface Config {
-  sessionId: string;
-  dbPath: string;
-  projectsDir: string;
-  outputPath: string | null;
-}
-
-export function parseArgs(argv: string[]): Config | never {
-  const args = minimist(argv.slice(2));
-
-  if (!args['session-id']) {
-    console.error(
-      `Error: --session-id is required.\n` +
-      `Usage: tsx src/index.ts --session-id <id> [options]\n` +
-      `Options:\n` +
-      `  --db-path <path>       SQLite DB path (default: ~/.claude/usage.db)\n` +
-      `  --projects-dir <path>   Projects directory (default: ~/.claude/projects)\n` +
-      `  --output <path>         Write JSON to file instead of stdout`
-    );
-    process.exit(1);
-  }
-
-  return {
-    sessionId: args['session-id'],
-    dbPath: args['db-path'] || getDbPath(),
-    projectsDir: args['projects-dir'] || getProjectsDir(),
-    outputPath: args['output'] || null,
-  };
-}
-
-export function outputJSON(data: FullTimelineSession, outputPath: string | null): void {
-  const json = JSON.stringify(data, null, 2);
-
-  if (outputPath) {
-    try {
-      fs.writeFileSync(outputPath, json, 'utf-8');
-      console.log(`✅ Output written to: ${outputPath}`);
-    } catch (err: any) {
-      console.error(`❌ Failed to write output file: ${outputPath}`);
-      console.error(`   Error: ${err.message}`);
-      // Fallback to stdout
-      console.log(json);
-    }
-  } else {
-    console.log(json);
-  }
-}
-
-// Main entry point
-function main() {
-  const config = parseArgs(process.argv);
-  const result = extractFullTimeline(config.sessionId, config.dbPath, config.projectsDir);
-  outputJSON(result, config.outputPath);
-}
-
-if (require.main === module) {
-  main();
-}
-```
+Key functions:
+- `parseArgs(argv)` — CLI arg parsing with --session-id, --db-path, --projects-dir, --output
+- `outputJSON(data, outputPath)` — JSON output to stdout or file
+- `main()` — orchestration entry point
 
 - [ ] **Step 4: Run tests to verify they pass**
 
@@ -1232,9 +1154,7 @@ git commit -m "feat: add CLI entry point with arg parsing and JSON output"
 
 ---
 
-## Chunk 5: Integration & Testing (Task 9)
-
-### Task 9: Integration Tests & Final Polish
+### Task 12: Integration Tests & Final Polish
 
 **Files:**
 - Create: `tests/integration.test.ts`
@@ -1244,15 +1164,16 @@ git commit -m "feat: add CLI entry point with arg parsing and JSON output"
 
 ```typescript
 // tests/integration.test.ts
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { execSync } from 'child_process';
 import * as path from 'path';
+import * as os from 'os';
+import * as fs from 'fs';
 
 describe('integration', () => {
   it('should run CLI with --help', () => {
     try {
-      const result = execSync('npx tsx src/index.ts', { encoding: 'utf-8' });
-      // Should fail with exit code 1 (missing --session-id)
+      execSync('npx tsx src/index.ts', { encoding: 'utf-8' });
     } catch (err: any) {
       expect(err.status).toBe(1);
       expect(err.stdout || err.stderr).toContain('session-id');
@@ -1260,15 +1181,12 @@ describe('integration', () => {
   });
 
   it('should produce valid JSON output for real session', () => {
-    // This test requires a real session ID from ~/.claude
-    // Skip if no sessions exist
     const dbPath = path.join(os.homedir(), '.claude', 'usage.db');
     if (!fs.existsSync(dbPath)) {
       console.warn('Skipping integration test: no usage.db found');
       return;
     }
 
-    // Get a real session ID
     const output = execSync(
       `sqlite3 ${dbPath} "SELECT session_id FROM sessions LIMIT 1;"`,
       { encoding: 'utf-8' }
@@ -1281,10 +1199,11 @@ describe('integration', () => {
       { encoding: 'utf-8' }
     );
 
-    // Should be valid JSON
     const parsed = JSON.parse(result);
     expect(parsed.session).toBeDefined();
     expect(parsed.turns).toBeDefined();
+    expect(parsed.subagents).toBeDefined();
+    expect(parsed.conversationGroups).toBeDefined();
     expect(parsed.pricing).toBeDefined();
   });
 });
@@ -1317,7 +1236,7 @@ npx tsx src/index.ts --session-id <id> --output timeline.json
 
 - [ ] **Step 4: Final lint + format**
 
-Run: `npm run lint && npm run format`
+Run: `pnpm run lint && pnpm run format`
 Expected: No errors.
 
 - [ ] **Step 5: Commit everything**
@@ -1336,7 +1255,15 @@ git commit -m "feat: add integration tests and finalize CLI usage docs"
 - [ ] All tasks are bite-sized (2-5 minutes each)
 - [ ] Tech stack is consistent (TypeScript, Biome, vitest)
 - [ ] No YAGNI features included
-- [ ] Module order follows dependency chain (types → utils → db-reader → jsonl-parser → merger → pricing → index)
+- [ ] Module order follows dependency chain (types → utils → db-reader → noise-filter → jsonl-parser → tool-matcher → subagent-resolver → merger → pricing → index)
+- [ ] Streaming readline is default (not fs.readFileSync)
+- [ ] RequestId deduplication is included
+- [ ] Noise filtering is included
+- [ ] sourceToolUseID matching is included
+- [ ] Subagent resolution is included (NEW + OLD structures)
+- [ ] Conversation grouping is included
+- [ ] Context consumption tracking is included
+- [ ] Ongoing session detection is included
 
 ---
 

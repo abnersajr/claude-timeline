@@ -18,7 +18,7 @@ User runs: tsx src/index.ts --session-id <id> [--db-path X] [--projects-dir Y]
 ```
 merger calls: dbReader.getSession(dbPath, sessionId)
           ↓
-1. Open SQLite DB (better-sqlite3 or sqlite3 package)
+1. Open SQLite DB (better-sqlite3)
 2. Query: SELECT * FROM sessions WHERE session_id = ?
 3. Return: SessionMetadata (sessionId, projectName, model, turnCount, totalTokens)
           ↓
@@ -28,22 +28,166 @@ merger calls: dbReader.getTurns(dbPath, sessionId)
 2. Return: Turn[] (with tokenUsage, toolName, cwd, but NO messages/toolCalls yet)
 ```
 
-### Step 3: JSONL Parsing (`src/jsonl-parser.ts`)
+### Step 3: Streaming JSONL Parsing (`src/jsonl-parser.ts`)
+
+Uses `readline.createInterface` for streaming line-by-line parsing (not `fs.readFileSync`).
 
 ```
-merger calls: jsonlParser.parseSessionJsonl(jsonlPath, sessionId)
+merger calls: jsonlParser.parseSessionJsonl(jsonlPath)
           ↓
-1. Construct jsonlPath from projectsDir + session.projectName + sessionId:
-   ~/.claude/projects/-Users-abnersoaresalvesjunior/19500eaa-3cc6-4111-a82d-f158e7f76ad3.jsonl
-2. Read file line-by-line (or full read for small files)
-3. For each line (JSON object):
-   - If type === 'assistant' → extract messages (content array)
-   - If type === 'user' AND content has tool_result → extract tool call results
-   - Match tool_use_id between tool_use and tool_result to pair them
-4. Return: { messages: Message[], toolCalls: ToolCall[] }
+1. Construct jsonlPath from projectsDir + session.projectName + sessionId
+2. Create streaming readline interface:
+   const fileStream = fs.createReadStream(jsonlPath, { encoding: 'utf8' });
+   const rl = readline.createInterface({ input: fileStream, crlfDelay: Infinity });
+3. For each line (streaming):
+   a. Parse JSON (skip malformed lines, increment malformedCount)
+   b. Skip entries without uuid (metadata entries)
+   c. Parse entry type → MessageType
+   d. Extract all metadata fields:
+      - uuid, parentUuid (message threading)
+      - isSidechain, isMeta, isCompactSummary (classification)
+      - sourceToolUseID, sourceToolAssistantUUID (tool linking)
+      - agentId, requestId, cwd, gitBranch
+      - userType, toolUseResult
+   e. Extract tool calls from content blocks (tool_use)
+   f. Extract tool results from content blocks (tool_result)
+   g. Parse usage → TokenUsage (with cache_creation breakdown)
+4. Deduplicate by requestId (keep LAST entry per requestId):
+   - Claude Code writes multiple entries per API response during streaming
+   - Only last entry per requestId has final, complete token counts
+   - Messages without requestId pass through unchanged
+5. Filter noise via noise-filter.ts:
+   - Skip: system, summary, file-history-snapshot, queue-operation types
+   - Skip: synthetic assistant messages (model='<synthetic>')
+   - Skip: sidechain messages (isSidechain=true)
+   - Skip: user messages with ONLY <local-command-caveat> or <system-reminder>
+6. Return: ParsedMessage[] (filtered, deduplicated)
 ```
 
-### Step 4: Merging (`src/merger.ts`)
+### Step 4: Noise Filtering (`src/noise-filter.ts`)
+
+```
+Called by jsonl-parser.ts during streaming parse:
+          ↓
+isDisplayableEntry(entry):
+  1. Check entry type → skip system, summary, file-history-snapshot, queue-operation
+  2. Check isSidechain → skip subagent messages
+  3. Check model → skip synthetic (model='<synthetic>')
+  4. For user messages:
+     - Check isMeta → keep (internal tool results, part of AI flow)
+     - Check content for hard noise tags → skip <local-command-caveat>, <system-reminder>
+     - Check for command output → keep <local-command-stdout>, <local-command-stderr>
+     - Keep real user input
+  5. For assistant messages → keep (creates AI chunk)
+
+classifyMessage(msg) → MessageCategory:
+  - 'hardNoise': filtered out entirely
+  - 'compact': compaction summary messages
+  - 'system': command output (<local-command-stdout>)
+  - 'user': real user input
+  - 'ai': assistant messages, tool results
+```
+
+### Step 5: Tool Call ↔ Result Matching (`src/tool-matcher.ts`)
+
+Uses `sourceToolUseID` as primary matching (more reliable than timestamp matching).
+
+```
+Called by merger.ts after JSONL parsing:
+          ↓
+buildToolExecutions(messages: ParsedMessage[]) → ToolExecution[]:
+  1. First pass: collect all tool calls from assistant messages
+     - Map: toolCallId → { call: ToolCall, startTime: Date }
+  2. Second pass: match with results
+     a. PRIMARY: Check sourceToolUseID on internal user messages
+        - If sourceToolUseID matches a tool call → create ToolExecution
+        - This is the most accurate matching method
+     b. FALLBACK: Check toolResults array
+        - For results not matched via sourceToolUseID
+        - Match by toolUseId in toolResults array
+  3. Add calls without results (pending/failed)
+  4. Sort by startTime
+  5. Return: ToolExecution[]
+```
+
+### Step 6: Subagent Resolution (`src/subagent-resolver.ts`)
+
+Handles both NEW and OLD subagent directory structures.
+
+```
+Called by merger.ts after tool matching:
+          ↓
+resolveSubagents(projectId, sessionId, taskCalls, messages) → Subagent[]:
+  1. Discover subagent files:
+     - NEW structure: {projectId}/{sessionId}/subagents/agent-{id}.jsonl
+     - OLD structure: {projectId}/agent-{id}.jsonl (filter by sessionId)
+  2. Parse each subagent file (streaming readline):
+     - Skip warmup subagents (first user message = "Warmup")
+     - Skip compact files (agentId starts with 'acompact')
+     - Extract timing (startTime, endTime, durationMs)
+     - Calculate metrics (tokens, message count)
+     - Check if ongoing (last event is activity, not ending)
+  3. Link to Task calls:
+     a. PRIMARY: Match by agentId from tool results
+        - Tool results for Task calls contain agentId field
+        - Match agentId → subagent file ID
+     b. SECONDARY: Match by description (for team spawns)
+        - Compare Task description to <teammate-message summary="..."> in subagent
+     c. FALLBACK: Positional matching (without wrap-around)
+  4. Propagate team metadata via parentUuid chain
+  5. Detect parallel execution (100ms overlap window):
+     - Group subagents by start time
+     - Mark agents in groups with multiple members as parallel
+  6. Enrich team colors from tool results
+  7. Sort by startTime
+  8. Return: Subagent[]
+```
+
+### Step 7: Conversation Grouping (`src/merger.ts`)
+
+Groups one user message with all AI responses until the next user message.
+
+```
+buildConversationGroups(messages, subagents) → ConversationGroup[]:
+  1. Filter to main thread only (not sidechain)
+  2. Find all real user messages (isParsedUserChunkMessage)
+  3. For each user message:
+     a. Collect all AI responses until next user message
+     b. Separate Task executions from regular tool executions
+     c. Link subagents to group by timing
+     d. Calculate group timing and metrics
+  4. Return: ConversationGroup[]
+```
+
+### Step 8: Context Consumption Tracking (`src/merger.ts`)
+
+Tracks context window consumption across compaction phases.
+
+```
+trackContextConsumption(messages) → { contextConsumption, compactionCount, phaseBreakdown }:
+  1. Track main-thread assistant input tokens
+  2. Detect compaction events (isCompactSummary flag)
+  3. Calculate per-phase contribution:
+     - Phase 1: tokens up to first compaction
+     - Middle phases: contribution = pre[i] - post[i-1]
+     - Last phase: final tokens - last post-compaction
+  4. Return: contextConsumption (total), compactionCount, phaseBreakdown[]
+```
+
+### Step 9: Ongoing Session Detection (`src/merger.ts`)
+
+Detects if a session is still active.
+
+```
+checkSessionOngoing(messages) → boolean:
+  1. Track "activity" events: thinking blocks, tool_use blocks
+  2. Track "ending" events: text output, ExitPlanMode, shutdown_response, user rejection
+  3. If last event is activity (not ending) → session is ongoing
+  4. Stale threshold: 5 minutes without file modification → dead session
+  5. Return: isOngoing boolean
+```
+
+### Step 10: Merging (`src/merger.ts`)
 
 ```
 merger.extractFullTimeline(sessionId, dbPath, projectsDir)
@@ -51,77 +195,71 @@ merger.extractFullTimeline(sessionId, dbPath, projectsDir)
 1. Get session metadata from dbReader.getSession()
 2. Get turns from dbReader.getTurns()
 3. Get projectName from session, construct JSONL path
-4. Parse JSONL: jsonlParser.parseSessionJsonl(jsonlPath, sessionId)
-   - Returns: { rawMessages: RawJsonlRecord[], toolCalls: ToolCall[] }
-5. For each Turn from SQLite (index i):
-   a. MATCHING ALGORITHM (deterministic):
-      - Primary: Find RawJsonlRecord with timestamp within 5 seconds of turn.timestamp
-      - Secondary: If multiple matches, use the one with matching uuid (if turn has uuid)
-      - Fallback: Use the i-th assistant message in JSONL (assumes ordered)
-   b. Normalize RawJsonlRecord → Message (extract content array, handle usage field)
-   c. Find tool calls that belong to this turn (by timestamp proximity)
-   d. Extract cache creation breakdown from RawJsonlRecord.usage.cache_creation
-   e. Infer cacheReadType (see Section 2 assumption notes)
-   f. Attach messages + toolCalls to the Turn object
-6. Calculate pricing: pricing.calculateSessionCost(session, turns)
-7. Return: FullTimelineSession
-```
-
-**Turn Matching Rules (deterministic):**
-- Each SQLite turn has a `timestamp` (from turns table)
-- Each JSONL assistant message has a `timestamp` (top-level field)
-- Match if: `abs(turn.timestamp - jsonlMsg.timestamp) < 5 seconds`
-- If multiple JSONL messages match, pick the one with matching `uuid` (if turn has uuid)
-- If no match by timestamp, use index-based: turn[i] → jsonlMessages[i] (assumes both are ordered by time)
-
-### Step 5: Pricing Calculation (`src/pricing.ts`)
-
-```
-pricing.calculateSessionCost(session, turns)
-          ↓
-1. Lookup model pricing: getPricing(session.model)
-   - If model unknown → use fallback rates, log warning
-   - If model known → get inputPerMTok, outputPerMTok, cacheCreation5mPerMTok, etc.
-2. For each Turn:
-   a. Calculate turn cost using TokenUsage + PricingRate
-   b. Separate cacheCreation5mCost vs cacheCreation1hCost
-   c. Infer cache read cost based on cacheReadType (default to 5m rate if unknown)
-3. Sum all turn costs → SessionPricing.totalCost
-4. Return: SessionPricing
-```
-
-### Step 6: JSON Output (`src/index.ts`)
-
-```
-FullTimelineSession (from merger)
-          ↓
-1. JSON.stringify(fullTimeline, null, 2)  // Pretty print
-2. Output to stdout (or write to --output file)
-3. Structure matches Appendix B.9 from session-report.md
+4. Parse JSONL (streaming): jsonlParser.parseSessionJsonl(jsonlPath)
+   - Returns: ParsedMessage[] (filtered, deduplicated)
+5. Match tool calls to results: toolMatcher.buildToolExecutions(messages)
+   - Returns: ToolExecution[]
+6. Resolve subagents: subagentResolver.resolveSubagents(projectId, sessionId, taskCalls, messages)
+   - Returns: Subagent[]
+7. Build conversation groups: buildConversationGroups(messages, subagents)
+   - Returns: ConversationGroup[]
+8. Track context consumption: trackContextConsumption(messages)
+   - Returns: { contextConsumption, compactionCount, phaseBreakdown }
+9. Detect ongoing status: checkSessionOngoing(messages)
+   - Returns: isOngoing boolean
+10. For each Turn from SQLite (index i):
+    a. MATCHING ALGORITHM (deterministic):
+       - Primary: Find ParsedMessage with timestamp within 5 seconds of turn.timestamp
+       - Secondary: If multiple matches, use the one with matching uuid
+       - Fallback: Use the i-th assistant message in JSONL (assumes ordered)
+    b. Attach matched messages + tool executions to Turn
+    c. Attach conversation group to Turn
+    d. Extract cache creation breakdown from ParsedMessage.usage
+    e. Infer cacheReadType
+11. Calculate pricing: pricing.calculateSessionCost(session, turns)
+12. Return: FullTimelineSession
 ```
 
 ### Data Flow Diagram (Text-Based)
 
 ```
 ┌─────────────┐     ┌──────────────┐     ┌──────────────┐
-│  SQLite DB │     │  JSONL File  │     │  Pricing DB  │
-│ usage.db   │     │  session.jsonl│     │  (hardcoded) │
+│  SQLite DB  │     │  JSONL File  │     │  Pricing DB  │
+│  usage.db   │     │ session.jsonl│     │  (hardcoded) │
 └─────┬───────┘     └──────┬───────┘     └──────┬───────┘
       │                    │                    │
       ▼                    ▼                    ▼
 ┌─────────────┐     ┌──────────────┐     ┌──────────────┐
 │ db-reader.ts│     │jsonl-parser.ts│     │ pricing.ts   │
-│ (sessions,  │     │ (messages,   │     │ (model rates,│
-│  turns)     │     │  tool calls) │     │  cost calc)  │
+│ (sessions,  │     │ (streaming,  │     │ (model rates,│
+│  turns)     │     │  dedup,      │     │  cost calc)  │
+│             │     │  noise filter│     │              │
 └─────┬───────┘     └──────┬───────┘     └──────┬───────┘
+      │                    │                    │
+      │              ┌─────┴─────┐              │
+      │              ▼           ▼              │
+      │     ┌──────────────┐ ┌──────────────┐  │
+      │     │noise-filter.ts│ │tool-matcher.ts│ │
+      │     │ (classify,   │ │ (sourceTool  │  │
+      │     │  filter)     │ │  UseID match)│  │
+      │     └──────────────┘ └──────────────┘  │
+      │                    │                    │
+      │              ┌─────┴─────┐              │
+      │              ▼           ▼              │
+      │     ┌──────────────┐ ┌──────────────┐  │
+      │     │subagent-     │ │conversation  │  │
+      │     │resolver.ts   │ │grouping      │  │
+      │     │ (discover,   │ │ (user+AI     │  │
+      │     │  parse, link)│ │  grouping)   │  │
+      │     └──────────────┘ └──────────────┘  │
       │                    │                    │
       └────────────────────┼────────────────────┘
                            ▼
                     ┌──────────────┐
                     │ merger.ts    │
-                    │ (merge all, │
-                    │  infer cache│
-                    │  types)     │
+                    │ (orchestrate,│
+                    │  match turns,│
+                    │  track ctx)  │
                     └──────┬───────┘
                            │
                            ▼
@@ -133,10 +271,16 @@ FullTimelineSession (from merger)
 ```
 
 ### Key Design Decisions for Data Flow:
-1. **SQLite is authoritative for token counts** (matches billed amounts in `usage.db`)
-2. **JSONL is authoritative for cache tier breakdown** (has `ephemeral_5m_input_tokens` vs `ephemeral_1h_input_tokens`)
-3. **Pricing is hardcoded** (no external API calls, as discussed)
-4. **Cache read type is inferred** (see Section 2 notes + CONTRIBUTING.md)
+1. **Streaming by default** — `readline.createInterface` for all JSONL parsing
+2. **RequestId deduplication** — Keep only last entry per requestId (streaming artifact)
+3. **Noise filtering** — Skip system/summary/synthetic/hard-noise messages
+4. **sourceToolUseID matching** — Primary method for tool call ↔ result pairing
+5. **Subagent resolution** — Handle both NEW and OLD directory structures
+6. **Conversation grouping** — Group user message + AI responses
+7. **Context consumption tracking** — Track tokens across compaction phases
+8. **Ongoing detection** — Mark sessions as in-progress vs completed
+9. **SQLite authoritative for tokens** — Matches billed amounts in usage.db
+10. **JSONL authoritative for cache breakdown** — Has 5m/1h breakdown
 
 ---
 

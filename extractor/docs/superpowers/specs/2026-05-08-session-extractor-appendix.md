@@ -56,6 +56,128 @@ The extractor respects `CLAUDE_CONFIG_DIR` env var, defaulting to `~/.claude`. T
 
 The `encoded_project_name` is derived from the `sessions.project_name` field in SQLite (e.g., `/Users/abnersoaresalvesjunior` → `-Users-abnersoaresalvesjunior`).
 
+### 5.5 RequestId Deduplication (Streaming Artifact)
+
+**File**: `src/jsonl-parser.ts`
+
+Claude Code writes multiple JSONL entries per API response during streaming. Each entry has the same `requestId` but incrementally increasing `output_tokens`. Only the **last** entry per `requestId` has the final, complete token counts.
+
+**Algorithm**: Keep only the last entry per `requestId`. Messages without `requestId` (user, system, etc.) pass through unchanged.
+
+**Source**: [claude-devtools jsonl.ts](https://github.com/matt1398/claude-devtools/blob/main/src/main/utils/jsonl.ts) — `deduplicateByRequestId()`
+
+### 5.6 Noise Filtering
+
+**File**: `src/noise-filter.ts`
+
+Claude Code JSONL files contain many noise entries that should be filtered out:
+
+**Hard noise types** (always skip):
+- `system` entries
+- `summary` entries
+- `file-history-snapshot` entries
+- `queue-operation` entries
+
+**Hard noise tags** (user messages with ONLY these tags):
+- `<local-command-caveat>`
+- `<system-reminder>`
+
+**Synthetic messages** (skip):
+- Assistant messages with `model='<synthetic>'`
+
+**Sidechain messages** (skip for main timeline):
+- Messages with `isSidechain=true` (subagent messages)
+
+**Displayable content** (keep):
+- Real user input (text, images)
+- Assistant messages (AI responses)
+- Tool result messages (`isMeta=true`, part of AI flow)
+- Command output (`<local-command-stdout>`, `<local-command-stderr>`)
+- Compaction summary messages (`isCompactSummary=true`)
+
+**Source**: [claude-devtools SessionContentFilter](https://github.com/matt1398/claude-devtools/blob/main/src/main/services/discovery/SessionContentFilter.ts)
+
+### 5.7 Subagent Resolution
+
+**File**: `src/subagent-resolver.ts`
+
+Claude Code spawns subagents (via Task tool) for parallel work. Subagent files are stored in two structures:
+
+**NEW structure** (current):
+```
+~/.claude/projects/{projectId}/{sessionId}/subagents/agent-{agentId}.jsonl
+```
+
+**OLD structure** (legacy):
+```
+~/.claude/projects/{projectId}/agent-{agentId}.jsonl
+```
+
+**Resolution algorithm**:
+1. Discover subagent files from both structures
+2. Parse each file (streaming readline)
+3. Skip warmup subagents (first user message = "Warmup")
+4. Skip compact files (agentId starts with 'acompact')
+5. Link to Task calls via agentId from tool results
+6. Detect parallel execution (100ms overlap window)
+7. Propagate team metadata via parentUuid chain
+
+**Source**: [claude-devtools SubagentResolver](https://github.com/matt1398/claude-devtools/blob/main/src/main/services/discovery/SubagentResolver.ts)
+
+### 5.8 Tool Call Matching
+
+**File**: `src/tool-matcher.ts`
+
+Tool calls are matched to their results using two methods:
+
+**Primary: sourceToolUseID** (most accurate)
+- Internal user messages (tool results) have a `sourceToolUseID` field
+- This field directly links the result to the tool call that generated it
+- Used by claude-devtools as the primary matching method
+
+**Fallback: toolResults array**
+- For results not matched via sourceToolUseID
+- Match by `toolUseId` in the `toolResults` array
+
+**Source**: [claude-devtools ToolExecutionBuilder](https://github.com/matt1398/claude-devtools/blob/main/src/main/services/analysis/ToolExecutionBuilder.ts)
+
+### 5.9 Ongoing Session Detection
+
+**File**: `src/merger.ts`
+
+A session is considered "ongoing" if the last event is an activity (not an ending):
+
+**Activity events**:
+- Thinking blocks
+- Tool use blocks (except ExitPlanMode, shutdown_response)
+
+**Ending events**:
+- Text output from Claude
+- ExitPlanMode tool
+- shutdown_response (agent shutting down)
+- User rejection of tool use
+- User interruption
+
+**Stale threshold**: 5 minutes without file modification → session is dead (not ongoing)
+
+**Source**: [claude-devtools analyzeSessionFileMetadata](https://github.com/matt1398/claude-devtools/blob/main/src/main/utils/jsonl.ts)
+
+### 5.10 Context Consumption Tracking
+
+**File**: `src/merger.ts`
+
+Context window consumption is tracked across compaction phases:
+
+1. Track main-thread assistant input tokens (input + cache_read + cache_creation)
+2. Detect compaction events (`isCompactSummary` flag)
+3. Calculate per-phase contribution:
+   - Phase 1: tokens up to first compaction
+   - Middle phases: contribution = pre[i] - post[i-1]
+   - Last phase: final tokens - last post-compaction
+4. Return: `contextConsumption` (total), `compactionCount`, `phaseBreakdown[]`
+
+**Source**: [claude-devtools analyzeSessionFileMetadata](https://github.com/matt1398/claude-devtools/blob/main/src/main/utils/jsonl.ts)
+
 ---
 
 ## 6. Future: Streaming Parser Integration
