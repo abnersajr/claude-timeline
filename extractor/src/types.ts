@@ -15,6 +15,7 @@ export interface RawJsonlRecord {
   timestamp?: string
   uuid?: string
   parentUuid?: string
+  requestId?: string
   message?: {
     role: string
     content: Array<Record<string, unknown>> | string

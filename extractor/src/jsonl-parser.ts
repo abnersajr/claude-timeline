@@ -1,4 +1,5 @@
 import { existsSync, readFileSync } from "node:fs"
+import { deduplicateByRequestId } from "./dedup"
 import { isDisplayableEntry } from "./noise-filter"
 import type { RawJsonlRecord, ToolCall } from "./types"
 
@@ -98,5 +99,9 @@ export function parseSessionJsonl(
     }
   }
 
-  return { rawMessages, toolCalls, malformedCount }
+  return {
+    rawMessages: deduplicateByRequestId(rawMessages),
+    toolCalls,
+    malformedCount,
+  }
 }
