@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import { extractFullTimeline, inferCacheReadType, matchTurnsToMessages } from "../src/merger"
+import { extractCommandExecuted, extractFullTimeline, inferCacheReadType, matchTurnsToMessages } from "../src/merger"
 import type { RawJsonlRecord, SessionMetadata, Turn } from "../src/types"
 
 // Mock db-reader (other agent is building this)
@@ -146,6 +146,63 @@ describe("merger", () => {
     })
   })
 
+  describe("extractCommandExecuted", () => {
+    it("should extract command from first user message with command-name tag", () => {
+      const messages: RawJsonlRecord[] = [
+        {
+          type: "user",
+          uuid: "1",
+          timestamp: "2026-05-07T19:22:39.000Z",
+          message: {
+            role: "user",
+            content: "<command-message>claude-hud:setup</command-message>\n<command-name>/claude-hud:setup</command-name>",
+          },
+        },
+      ]
+      const result = extractCommandExecuted(messages)
+      expect(result).toBe("/claude-hud:setup")
+    })
+
+    it("should return undefined for sessions without command", () => {
+      const messages: RawJsonlRecord[] = [
+        {
+          type: "user",
+          uuid: "1",
+          timestamp: "2026-05-07T19:22:39.000Z",
+          message: { role: "user", content: "Fix the bug in auth.ts" },
+        },
+      ]
+      const result = extractCommandExecuted(messages)
+      expect(result).toBeUndefined()
+    })
+
+    it("should return undefined for empty messages", () => {
+      expect(extractCommandExecuted([])).toBeUndefined()
+    })
+
+    it("should only check first user message, not scan later ones", () => {
+      const messages: RawJsonlRecord[] = [
+        {
+          type: "user",
+          uuid: "1",
+          timestamp: "2026-05-07T19:22:39.000Z",
+          message: { role: "user", content: "No command here" },
+        },
+        {
+          type: "user",
+          uuid: "2",
+          timestamp: "2026-05-07T19:22:40.000Z",
+          message: {
+            role: "user",
+            content: "<command-name>/some-command</command-name>",
+          },
+        },
+      ]
+      const result = extractCommandExecuted(messages)
+      expect(result).toBeUndefined()
+    })
+  })
+
   describe("extractFullTimeline", () => {
     it("should return FullTimelineSession with all fields", async () => {
       vi.mocked(getSession).mockReturnValue(mockSession)
@@ -180,6 +237,29 @@ describe("merger", () => {
       expect(result.session.sessionId).toBe("test-session")
       expect(result.turns.length).toBe(2)
       expect(result.turns[0].messages.length).toBe(0)
+    })
+
+    it("should set session.commandExecuted from first user command tag", async () => {
+      vi.mocked(getSession).mockReturnValue(mockSession)
+      vi.mocked(getTurns).mockReturnValue(mockTurns)
+      vi.mocked(parseSessionJsonl).mockReturnValue({
+        rawMessages: [
+          {
+            type: "user",
+            uuid: "u1",
+            timestamp: "2026-05-07T19:22:39.000Z",
+            message: {
+              role: "user",
+              content: "<command-name>/claude-hud:setup</command-name>",
+            },
+          },
+        ],
+        toolCalls: [],
+        malformedCount: 0,
+      })
+
+      const result = await extractFullTimeline("test-session", "/tmp/usage.db", "/tmp/projects")
+      expect(result.session.commandExecuted).toBe("/claude-hud:setup")
     })
   })
 })

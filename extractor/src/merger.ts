@@ -5,49 +5,70 @@ import type { FullTimelineSession, Message, MessageContent, RawJsonlRecord, Turn
 import { resolveSessionJsonlPath } from "./utils"
 
 /**
- * Match SQLite turns to JSONL messages by timestamp.
+ * Match SQLite turns to JSONL messages and tool calls by timestamp.
  * Primary: timestamp within 5 seconds.
  * Fallback: index-based matching.
- * Each message is matched to at most one turn (closest timestamp wins).
+ * Each message/tool call is matched to at most one turn (closest timestamp wins).
  */
-export function matchTurnsToMessages(turns: Turn[], messages: RawJsonlRecord[]): Turn[] {
-  if (messages.length === 0) return turns
+export function matchTurnsToMessages(
+  turns: Turn[],
+  messages: RawJsonlRecord[],
+  toolCalls?: import("./types.js").ToolCall[],
+): Turn[] {
+  if (messages.length === 0 && (!toolCalls || toolCalls.length === 0)) return turns
 
   // Track which messages have been matched
-  const matchedIndices = new Set<number>()
+  const matchedMsgIndices = new Set<number>()
+  // Track which tool calls have been matched
+  const matchedTcIndices = new Set<number>()
 
-  const matched = turns.map((turn, _turnIndex) => {
+  const matched = turns.map((turn) => {
     const turnTime = new Date(turn.timestamp).getTime()
     const matchedMessages: RawJsonlRecord[] = []
+    const matchedToolCalls: import("./types.js").ToolCall[] = []
 
     // Find closest unmatched message within 5 seconds
-    let bestIndex = -1
-    let bestDiff = Number.MAX_VALUE
+    let bestMsgIndex = -1
+    let bestMsgDiff = Number.MAX_VALUE
 
     for (let i = 0; i < messages.length; i++) {
-      if (matchedIndices.has(i)) continue
+      if (matchedMsgIndices.has(i)) continue
       const msg = messages[i]
       if (!msg.timestamp) continue
       const msgTime = new Date(msg.timestamp).getTime()
       const diff = Math.abs(turnTime - msgTime)
-      if (diff < 5000 && diff < bestDiff) {
-        bestDiff = diff
-        bestIndex = i
+      if (diff < 5000 && diff < bestMsgDiff) {
+        bestMsgDiff = diff
+        bestMsgIndex = i
       }
     }
 
-    if (bestIndex >= 0) {
-      matchedMessages.push(messages[bestIndex])
-      matchedIndices.add(bestIndex)
+    if (bestMsgIndex >= 0) {
+      matchedMessages.push(messages[bestMsgIndex])
+      matchedMsgIndices.add(bestMsgIndex)
     }
 
     // Fallback: index-based matching (use first unmatched)
     if (matchedMessages.length === 0) {
       for (let i = 0; i < messages.length; i++) {
-        if (!matchedIndices.has(i)) {
+        if (!matchedMsgIndices.has(i)) {
           matchedMessages.push(messages[i])
-          matchedIndices.add(i)
+          matchedMsgIndices.add(i)
           break
+        }
+      }
+    }
+
+    // Match tool calls by timestamp within 5 seconds
+    if (toolCalls) {
+      for (let i = 0; i < toolCalls.length; i++) {
+        if (matchedTcIndices.has(i)) continue
+        const tc = toolCalls[i]
+        if (!tc.timestamp) continue
+        const tcTime = new Date(tc.timestamp).getTime()
+        if (Math.abs(turnTime - tcTime) < 5000) {
+          matchedToolCalls.push(tc)
+          matchedTcIndices.add(i)
         }
       }
     }
@@ -59,7 +80,7 @@ export function matchTurnsToMessages(turns: Turn[], messages: RawJsonlRecord[]):
       content: normalizeContent(m.message?.content ?? []),
     }))
 
-    return { ...turn, messages: normalizedMessages }
+    return { ...turn, messages: normalizedMessages, toolCalls: matchedToolCalls }
   })
 
   return matched
@@ -68,7 +89,10 @@ export function matchTurnsToMessages(turns: Turn[], messages: RawJsonlRecord[]):
 /**
  * Normalize content blocks to MessageContent[]
  */
-function normalizeContent(content: Array<Record<string, unknown>>): MessageContent[] {
+function normalizeContent(content: Array<Record<string, unknown>> | string): MessageContent[] {
+  if (typeof content === "string") {
+    return [{ type: "text" as const, text: content }]
+  }
   return content.map((block) => {
     const type = block.type as string
     if (type === "text") {
@@ -126,6 +150,21 @@ export function inferCacheReadType(
 }
 
 /**
+ * Extract commandExecuted from the first user message.
+ * Looks for <command-name>/...</command-name> tags in content.
+ */
+export function extractCommandExecuted(messages: RawJsonlRecord[]): string | undefined {
+  const firstUser = messages.find((m) => m.type === "user")
+  if (!firstUser) return undefined
+
+  const content = firstUser.message?.content
+  if (typeof content !== "string") return undefined
+
+  const match = content.match(/<command-name>([\s\S]*?)<\/command-name>/)
+  return match?.[1]?.trim() || undefined
+}
+
+/**
  * Extract full timeline for a session by merging SQLite and JSONL data.
  */
 export async function extractFullTimeline(
@@ -141,8 +180,12 @@ export async function extractFullTimeline(
   const jsonlPath = resolveSessionJsonlPath(session, projectsDir)
   const jsonlResult = parseSessionJsonl(jsonlPath, sessionId)
 
-  // 3. Match turns to messages
-  const matchedTurns = matchTurnsToMessages(turns, jsonlResult?.rawMessages ?? [])
+  // 3. Match turns to messages and tool calls
+  const matchedTurns = matchTurnsToMessages(
+    turns,
+    jsonlResult?.rawMessages ?? [],
+    jsonlResult?.toolCalls,
+  )
 
   // 4. Infer cache read types
   const enrichedTurns = matchedTurns.map((turn, i) => ({
@@ -153,8 +196,11 @@ export async function extractFullTimeline(
   // 5. Calculate pricing
   const pricing = calculateSessionCost(session, enrichedTurns)
 
+  // 6. Extract command executed from JSONL
+  const commandExecuted = extractCommandExecuted(jsonlResult?.rawMessages ?? [])
+
   return {
-    session,
+    session: { ...session, commandExecuted },
     turns: enrichedTurns,
     pricing,
   }
