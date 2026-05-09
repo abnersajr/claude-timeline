@@ -159,6 +159,59 @@ export function getModelForSession(dbPath: string, sessionId: string): string {
   }
 }
 
+/** Processed file entry */
+export interface ProcessedFile {
+  path: string
+  mtime: number
+  lines: number
+  sessionId: string | null
+}
+
+/**
+ * Extract session ID from JSONL file path.
+ * e.g., '/.../abc-123.jsonl' -> 'abc-123'
+ */
+function extractSessionIdFromPath(filePath: string): string | null {
+  const match = filePath.match(/([^/]+)\.jsonl$/)
+  return match ? match[1] : null
+}
+
+/**
+ * Get processed files from the DB.
+ * Returns empty array if table doesn't exist.
+ */
+export function getProcessedFiles(dbPath: string): ProcessedFile[] {
+  let db: Database.Database
+  try {
+    db = new Database(dbPath, { readonly: true })
+  } catch (_err) {
+    throw new DbOpenError(`Failed to open database: ${dbPath}`)
+  }
+
+  try {
+    const tableExists = db
+      .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='processed_files'")
+      .get()
+
+    if (!tableExists) return []
+
+    const rows = db.prepare("SELECT * FROM processed_files").all() as Array<{
+      path: string
+      mtime: number
+      lines: number
+    }>
+
+    return rows.map((row) => ({
+      path: row.path,
+      mtime: row.mtime,
+      lines: row.lines,
+      sessionId: extractSessionIdFromPath(row.path),
+    }))
+  } finally {
+    db.close()
+  }
+}
+
 /** Session summary for listing */
 export interface SessionSummary {
   sessionId: string

@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, test } from "vitest"
 import {
   DbOpenError,
   getModelForSession,
+  getProcessedFiles,
   getSession,
   getTurns,
   listSessions,
@@ -172,5 +173,52 @@ describe("listSessions", () => {
     expect(sessions).toEqual([])
 
     rmSync(dir, { recursive: true, force: true })
+  })
+})
+
+describe("getProcessedFiles", () => {
+  test("returns processed file entries", () => {
+    const db = new Database(dbPath)
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS processed_files (
+        path TEXT PRIMARY KEY,
+        mtime REAL,
+        lines INTEGER
+      )
+    `)
+    db.exec(`
+      INSERT INTO processed_files VALUES (
+        '/Users/test/.claude/projects/-Users-test/abc-12345678-1234-1234-1234-123456789012.jsonl',
+        1778182387.61482,
+        135
+      )
+    `)
+    db.close()
+
+    const files = getProcessedFiles(dbPath)
+    expect(files.length).toBe(1)
+    expect(files[0].path).toContain("abc-12345678-1234-1234-1234-123456789012.jsonl")
+    expect(files[0].lines).toBe(135)
+    expect(files[0].sessionId).toBe("abc-12345678-1234-1234-1234-123456789012")
+  })
+
+  test("returns empty array when table is empty", () => {
+    const db = new Database(dbPath)
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS processed_files (
+        path TEXT PRIMARY KEY,
+        mtime REAL,
+        lines INTEGER
+      )
+    `)
+    db.close()
+
+    const files = getProcessedFiles(dbPath)
+    expect(files).toEqual([])
+  })
+
+  test("returns empty array when table does not exist", () => {
+    const files = getProcessedFiles(dbPath)
+    expect(files).toEqual([])
   })
 })
