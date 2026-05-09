@@ -154,15 +154,14 @@ export function inferCacheReadType(
  * Looks for <command-name>/...</command-name> tags in content.
  */
 export function extractCommandExecuted(messages: RawJsonlRecord[]): string | undefined {
-  for (const msg of messages) {
-    if (msg.type !== "user") continue
-    const content = msg.message?.content
-    if (typeof content !== "string") continue
-    const match = content.match(/<command-name>(.+?)<\/command-name>/)
-    if (match) return match[1]
-    break
-  }
-  return undefined
+  const firstUser = messages.find((m) => m.type === "user")
+  if (!firstUser) return undefined
+
+  const content = firstUser.message?.content
+  if (typeof content !== "string") return undefined
+
+  const match = content.match(/<command-name>(.+?)<\/command-name>/)
+  return match?.[1]
 }
 
 /**

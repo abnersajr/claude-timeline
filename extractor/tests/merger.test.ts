@@ -179,6 +179,28 @@ describe("merger", () => {
     it("should return undefined for empty messages", () => {
       expect(extractCommandExecuted([])).toBeUndefined()
     })
+
+    it("should only check first user message, not scan later ones", () => {
+      const messages: RawJsonlRecord[] = [
+        {
+          type: "user",
+          uuid: "1",
+          timestamp: "2026-05-07T19:22:39.000Z",
+          message: { role: "user", content: "No command here" },
+        },
+        {
+          type: "user",
+          uuid: "2",
+          timestamp: "2026-05-07T19:22:40.000Z",
+          message: {
+            role: "user",
+            content: "<command-name>/some-command</command-name>",
+          },
+        },
+      ]
+      const result = extractCommandExecuted(messages)
+      expect(result).toBeUndefined()
+    })
   })
 
   describe("extractFullTimeline", () => {
