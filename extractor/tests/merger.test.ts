@@ -238,5 +238,28 @@ describe("merger", () => {
       expect(result.turns.length).toBe(2)
       expect(result.turns[0].messages.length).toBe(0)
     })
+
+    it("should set session.commandExecuted from first user command tag", async () => {
+      vi.mocked(getSession).mockReturnValue(mockSession)
+      vi.mocked(getTurns).mockReturnValue(mockTurns)
+      vi.mocked(parseSessionJsonl).mockReturnValue({
+        rawMessages: [
+          {
+            type: "user",
+            uuid: "u1",
+            timestamp: "2026-05-07T19:22:39.000Z",
+            message: {
+              role: "user",
+              content: "<command-name>/claude-hud:setup</command-name>",
+            },
+          },
+        ],
+        toolCalls: [],
+        malformedCount: 0,
+      })
+
+      const result = await extractFullTimeline("test-session", "/tmp/usage.db", "/tmp/projects")
+      expect(result.session.commandExecuted).toBe("/claude-hud:setup")
+    })
   })
 })

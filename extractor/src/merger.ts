@@ -160,8 +160,8 @@ export function extractCommandExecuted(messages: RawJsonlRecord[]): string | und
   const content = firstUser.message?.content
   if (typeof content !== "string") return undefined
 
-  const match = content.match(/<command-name>(.+?)<\/command-name>/)
-  return match?.[1]
+  const match = content.match(/<command-name>([\s\S]*?)<\/command-name>/)
+  return match?.[1]?.trim() || undefined
 }
 
 /**
