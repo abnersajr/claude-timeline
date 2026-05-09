@@ -6,10 +6,11 @@ import { getDbPath, getProjectsDir } from "./utils"
 
 /** CLI configuration */
 export interface Config {
-  sessionId: string
+  sessionId: string | null
   dbPath: string
   projectsDir: string
   outputPath: string | null
+  listSessions: boolean
 }
 
 /**
@@ -20,29 +21,34 @@ export interface Config {
 export function parseArgs(argv: string[]): Config {
   const args = minimist(argv.slice(2))
 
-  if (!args["session-id"]) {
+  const listSessions = Boolean(args["list-sessions"])
+
+  if (!listSessions && !args["session-id"]) {
     throw new Error(
-      "Error: --session-id is required.\n" +
+      "Error: --session-id is required (or use --list-sessions).\n" +
         "Usage: tsx src/index.ts --session-id <id> [options]\n" +
+        "       tsx src/index.ts --list-sessions\n" +
         "Options:\n" +
         "  --db-path <path>        SQLite DB path (default: ~/.claude/usage.db)\n" +
         "  --projects-dir <path>   Projects directory (default: ~/.claude/projects)\n" +
-        "  --output <path>         Write JSON to file instead of stdout",
+        "  --output <path>         Write JSON to file instead of stdout\n" +
+        "  --list-sessions         List recent sessions and exit",
     )
   }
 
   return {
-    sessionId: args["session-id"],
+    sessionId: args["session-id"] || null,
     dbPath: args["db-path"] || getDbPath(),
     projectsDir: args["projects-dir"] || getProjectsDir(),
     outputPath: args.output || null,
+    listSessions,
   }
 }
 
 /**
  * Output JSON to stdout or file.
  */
-export function outputJSON(data: FullTimelineSession, outputPath: string | null): void {
+export function outputJSON(data: FullTimelineSession | unknown[], outputPath: string | null): void {
   const json = JSON.stringify(data, null, 2)
 
   if (outputPath) {
@@ -65,7 +71,15 @@ export function outputJSON(data: FullTimelineSession, outputPath: string | null)
  */
 async function main(): Promise<void> {
   const config = parseArgs(process.argv)
-  const data = await extractFullTimeline(config.sessionId, config.dbPath, config.projectsDir)
+
+  if (config.listSessions) {
+    const { listSessions } = await import("./db-reader.js")
+    const sessions = listSessions(config.dbPath)
+    outputJSON(sessions, config.outputPath)
+    return
+  }
+
+  const data = await extractFullTimeline(config.sessionId!, config.dbPath, config.projectsDir)
   outputJSON(data, config.outputPath)
 }
 
