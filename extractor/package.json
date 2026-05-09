@@ -4,6 +4,80 @@
   "description": "Claude Code session timeline extractor",
   "type": "module",
   "main": "./src/index.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./types": {
+      "import": "./dist/types.js",
+      "types": "./dist/types.d.ts"
+    },
+    "./dedup": {
+      "import": "./dist/dedup.js",
+      "types": "./dist/dedup.d.ts"
+    },
+    "./classifier": {
+      "import": "./dist/classifier.js",
+      "types": "./dist/classifier.d.ts"
+    },
+    "./tool-extraction": {
+      "import": "./dist/tool-extraction.js",
+      "types": "./dist/tool-extraction.d.ts"
+    },
+    "./model-parser": {
+      "import": "./dist/model-parser.js",
+      "types": "./dist/model-parser.d.ts"
+    },
+    "./pricing": {
+      "import": "./dist/pricing.js",
+      "types": "./dist/pricing.d.ts"
+    },
+    "./context-tracker": {
+      "import": "./dist/context-tracker.js",
+      "types": "./dist/context-tracker.d.ts"
+    },
+    "./conversation-groups": {
+      "import": "./dist/conversation-groups.js",
+      "types": "./dist/conversation-groups.d.ts"
+    },
+    "./session-state": {
+      "import": "./dist/session-state.js",
+      "types": "./dist/session-state.d.ts"
+    },
+    "./subagent-locator": {
+      "import": "./dist/subagent-locator.js",
+      "types": "./dist/subagent-locator.d.ts"
+    },
+    "./subagent-resolver": {
+      "import": "./dist/subagent-resolver.js",
+      "types": "./dist/subagent-resolver.d.ts"
+    },
+    "./db-reader": {
+      "import": "./dist/db-reader.js",
+      "types": "./dist/db-reader.d.ts"
+    },
+    "./merger": {
+      "import": "./dist/merger.js",
+      "types": "./dist/merger.d.ts"
+    },
+    "./utils": {
+      "import": "./dist/utils.js",
+      "types": "./dist/utils.d.ts"
+    },
+    "./tool-matcher": {
+      "import": "./dist/tool-matcher.js",
+      "types": "./dist/tool-matcher.d.ts"
+    },
+    "./jsonl-parser": {
+      "import": "./dist/jsonl-parser.js",
+      "types": "./dist/jsonl-parser.d.ts"
+    },
+    "./noise-filter": {
+      "import": "./dist/noise-filter.js",
+      "types": "./dist/noise-filter.d.ts"
+    }
+  },
   "engines": {
     "node": ">=24.15.0",
     "pnpm": ">=11.0.0"
