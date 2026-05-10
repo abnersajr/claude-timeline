@@ -88,22 +88,62 @@ function TurnBar({
   maxTokens: number
 }) {
   const [hovered, setHovered] = useState(false)
+  const barRef = useRef<HTMLDivElement>(null)
   const total = turnTotal(turn)
 
   if (maxTokens === 0) return null
 
   const barHeight = Math.max((total / maxTokens) * MAX_BAR_HEIGHT, MIN_BAR_HEIGHT)
 
+  // Calculate fixed position for tooltip when hovered
+  const getTooltipStyle = (): React.CSSProperties => {
+    if (!barRef.current) return {}
+    const rect = barRef.current.getBoundingClientRect()
+    return {
+      position: "fixed" as const,
+      left: `${rect.left + rect.width / 2}px`,
+      top: `${rect.top - 8}px`,
+      transform: "translate(-50%, -100%)",
+      zIndex: 9999,
+      minWidth: "180px",
+    }
+  }
+
   return (
     <div
       className="group relative flex flex-col items-center"
       style={{ width: `${BAR_WIDTH + BAR_GAP}px` }}
     >
-      {/* Tooltip — positioned above the bar */}
+      {/* Bar — fixed 20px wide, grows upward from bottom */}
+      <div
+        ref={barRef}
+        className="relative flex flex-col-reverse cursor-pointer rounded-sm overflow-hidden"
+        style={{ width: `${BAR_WIDTH}px`, height: `${barHeight}px` }}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+      >
+        {SEGMENTS.map((seg) => {
+          const val = segmentTotal(turn.tokenUsage, seg.key)
+          if (val === 0) return null
+          const segHeight = total > 0 ? (val / total) * barHeight : 0
+          return (
+            <div
+              key={seg.key}
+              className={cn(
+                "w-full transition-opacity group-hover:opacity-80",
+                seg.color,
+              )}
+              style={{ height: `${Math.max(segHeight, 0.5)}px` }}
+            />
+          )
+        })}
+      </div>
+
+      {/* Tooltip — fixed positioning to escape ALL overflow containers */}
       {hovered && (
         <div
-          className="absolute z-50 bottom-full mb-2 pointer-events-none rounded-lg border border-border bg-card p-3 shadow-lg"
-          style={{ minWidth: "180px" }}
+          style={getTooltipStyle()}
+          className="pointer-events-none rounded-lg border border-border bg-card p-3 shadow-lg"
         >
           <p className="mb-1.5 text-xs font-semibold text-foreground">
             Turn {index + 1}
@@ -133,30 +173,6 @@ function TurnBar({
           </div>
         </div>
       )}
-
-      {/* Bar — fixed 20px wide, grows upward from bottom */}
-      <div
-        className="relative flex flex-col-reverse cursor-pointer rounded-sm overflow-hidden"
-        style={{ width: `${BAR_WIDTH}px`, height: `${barHeight}px` }}
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
-      >
-        {SEGMENTS.map((seg) => {
-          const val = segmentTotal(turn.tokenUsage, seg.key)
-          if (val === 0) return null
-          const segHeight = total > 0 ? (val / total) * barHeight : 0
-          return (
-            <div
-              key={seg.key}
-              className={cn(
-                "w-full transition-opacity group-hover:opacity-80",
-                seg.color,
-              )}
-              style={{ height: `${Math.max(segHeight, 0.5)}px` }}
-            />
-          )
-        })}
-      </div>
 
       {/* Label — every 5th turn, below the bar */}
       <span
@@ -197,7 +213,7 @@ export function TokenChart({ turns, className }: TokenChartProps) {
 
   if (turns.length === 0) {
     return (
-      <div className={cn("rounded-xl border border-border bg-card p-6", className)}>
+      <div className={cn("rounded-xl border border-border bg-background p-6 overflow-visible", className)}>
         <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
           Token Usage
         </h3>
@@ -219,9 +235,9 @@ export function TokenChart({ turns, className }: TokenChartProps) {
       : turns.filter((_, i) => i % Math.ceil(turns.length / maxBars) === 0 || i === turns.length - 1)
 
   return (
-    <div className={cn("rounded-xl border border-border bg-card p-6", className)}>
-      {/* Header with subtle background */}
-      <div className="mb-4 rounded-lg bg-muted/50 px-4 py-3">
+    <div className={cn("rounded-xl border border-border bg-background p-6 overflow-visible", className)}>
+      {/* Header */}
+      <div className="mb-4 px-1">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
             Token Usage
@@ -235,44 +251,46 @@ export function TokenChart({ turns, className }: TokenChartProps) {
         </div>
       </div>
 
-      {/* Chart area — horizontal scroll for many bars */}
-      <div
-        ref={scrollRef}
-        className="relative overflow-x-auto"
-        style={
-          overflowing
-            ? {
-                maskImage:
-                  "linear-gradient(to right, transparent, black 24px, black calc(100% - 24px), transparent)",
-                WebkitMaskImage:
-                  "linear-gradient(to right, transparent, black 24px, black calc(100% - 24px), transparent)",
-              }
-            : undefined
-        }
-      >
+      {/* Chart area — tooltip must be OUTSIDE overflow container to avoid clipping */}
+      <div className="relative mt-4">
         <div
-          className="flex items-end"
-          style={{ gap: `${BAR_GAP}px`, minHeight: `${MAX_BAR_HEIGHT + LABEL_HEIGHT + 8}px` }}
+          ref={scrollRef}
+          className="overflow-x-auto"
+          style={
+            overflowing
+              ? {
+                  maskImage:
+                    "linear-gradient(to right, transparent, black 24px, black calc(100% - 24px), transparent)",
+                  WebkitMaskImage:
+                    "linear-gradient(to right, transparent, black 24px, black calc(100% - 24px), transparent)",
+                }
+              : undefined
+          }
         >
-          {displayTurns.map((turn, i) => {
-            const originalIndex =
-              turns.length <= maxBars
-                ? i
-                : turns.indexOf(turn)
-            return (
-              <TurnBar
-                key={turn.timestamp}
-                turn={turn}
-                index={originalIndex}
-                maxTokens={maxTokens}
-              />
-            )
-          })}
+          <div
+            className="flex items-end"
+            style={{ gap: `${BAR_GAP}px`, minHeight: `${MAX_BAR_HEIGHT + LABEL_HEIGHT + 8}px` }}
+          >
+            {displayTurns.map((turn, i) => {
+              const originalIndex =
+                turns.length <= maxBars
+                  ? i
+                  : turns.indexOf(turn)
+              return (
+                <TurnBar
+                  key={turn.timestamp}
+                  turn={turn}
+                  index={originalIndex}
+                  maxTokens={maxTokens}
+                />
+              )
+            })}
+          </div>
         </div>
       </div>
 
-      {/* Summary row — subtle background with more padding */}
-      <div className="mt-4 grid grid-cols-5 gap-2 rounded-lg bg-muted/50 p-3">
+      {/* Summary row */}
+      <div className="mt-4 grid grid-cols-5 gap-2 rounded-lg border border-border/50 p-3">
         {SEGMENTS.map((seg) => {
           const total = turns.reduce(
             (sum, t) => sum + segmentTotal(t.tokenUsage, seg.key),

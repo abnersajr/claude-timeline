@@ -18,6 +18,18 @@ describe("noise-filter", () => {
     expect(isDisplayableEntry({ type: "queue-operation", uuid: "1" })).toBe(false)
   })
 
+  it("should filter out attachment entries", () => {
+    expect(isDisplayableEntry({ type: "attachment", uuid: "1" })).toBe(false)
+  })
+
+  it("should filter out last-prompt entries", () => {
+    expect(isDisplayableEntry({ type: "last-prompt", uuid: "1" })).toBe(false)
+  })
+
+  it("should filter out permission-mode entries", () => {
+    expect(isDisplayableEntry({ type: "permission-mode", uuid: "1" })).toBe(false)
+  })
+
   it("should filter out synthetic assistant messages", () => {
     expect(
       isDisplayableEntry({

@@ -8,7 +8,7 @@ export function Skeleton({ className }: SkeletonProps) {
   return (
     <div
       className={cn(
-        "animate-pulse rounded-md bg-surface-3",
+        "animate-pulse rounded-md bg-accent",
         className,
       )}
     />
@@ -19,7 +19,7 @@ export function SessionDetailSkeleton() {
   return (
     <div className="space-y-6 p-6">
       {/* Overview card skeleton */}
-      <div className="rounded-xl border border-border bg-surface-1 p-6 space-y-4">
+      <div className="rounded-xl border border-border bg-card p-6 space-y-4">
         <Skeleton className="h-7 w-48" />
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <Skeleton className="h-16 w-full" />
@@ -41,7 +41,7 @@ export function SessionDetailSkeleton() {
         {Array.from({ length: 5 }, (_, i) => (
           <div
             key={i}
-            className="rounded-lg border border-border bg-surface-1 p-4 space-y-3"
+            className="rounded-lg border border-border bg-card p-4 space-y-3"
           >
             <div className="flex items-center justify-between">
               <Skeleton className="h-5 w-24" />
@@ -67,7 +67,7 @@ export function SessionListSkeleton() {
       {Array.from({ length: 8 }, (_, i) => (
         <div
           key={i}
-          className="flex items-center gap-4 rounded-lg border border-border bg-surface-1 p-4"
+          className="flex items-center gap-4 rounded-lg border border-border bg-card p-4"
         >
           <Skeleton className="h-5 w-32 flex-shrink-0" />
           <Skeleton className="h-5 w-24 flex-shrink-0" />

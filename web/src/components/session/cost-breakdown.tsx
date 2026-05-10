@@ -34,11 +34,11 @@ interface PricingRateRowProps {
 type CostKey = "inputCost" | "outputCost" | "cacheReadCost" | "cacheCreation5mCost" | "cacheCreation1hCost"
 
 const COST_CATEGORIES: { key: CostKey; label: string; color: string }[] = [
-  { key: "inputCost", label: "Input", color: "bg-accent-blue" },
-  { key: "outputCost", label: "Output", color: "bg-accent-green" },
-  { key: "cacheReadCost", label: "Cache Read", color: "bg-accent-amber" },
-  { key: "cacheCreation5mCost", label: "Cache Write (5m)", color: "bg-accent-purple" },
-  { key: "cacheCreation1hCost", label: "Cache Write (1h)", color: "bg-accent-pink" },
+  { key: "inputCost", label: "Input", color: "bg-blue-500" },
+  { key: "outputCost", label: "Output", color: "bg-emerald-500" },
+  { key: "cacheReadCost", label: "Cache Read", color: "bg-amber-500" },
+  { key: "cacheCreation5mCost", label: "Cache Write (5m)", color: "bg-violet-500" },
+  { key: "cacheCreation1hCost", label: "Cache Write (1h)", color: "bg-pink-500" },
 ]
 
 // ---------------------------------------------------------------------------
@@ -153,7 +153,7 @@ export function CostBreakdown({ pricing, turns, className }: CostBreakdownProps)
   const aggregated = aggregateCosts(turnsPricing)
 
   return (
-    <div className={cn("rounded-xl border border-border bg-surface-1 p-6", className)}>
+    <div className={cn("rounded-xl border border-border bg-background p-6", className)}>
       {/* Header */}
       <div className="mb-4 flex items-center justify-between">
         <h3 className="text-sm font-semibold uppercase tracking-wider text-text-muted">

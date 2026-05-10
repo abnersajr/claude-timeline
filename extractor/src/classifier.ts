@@ -1,7 +1,7 @@
 import type { ClassifiedMessage, MessageCategory, RawJsonlRecord } from "./types"
 
 /** Entry types that are always noise */
-const NOISE_TYPES = new Set(["system", "summary", "file-history-snapshot", "queue-operation"])
+const NOISE_TYPES = new Set(["system", "summary", "file-history-snapshot", "queue-operation", "attachment", "last-prompt", "permission-mode"])
 
 /** Hard noise tags that should be filtered out entirely */
 const HARD_NOISE_TAGS = ["<local-command-caveat>", "<system-reminder>"]
@@ -28,7 +28,7 @@ function hasTextOrImageContent(
 // ─── Type guard functions ───────────────────────────────────────────
 
 /**
- * Hard noise: system/summary/file-history-snapshot/queue-operation types,
+ * Hard noise: system/summary/file-history-snapshot/queue-operation/attachment/last-prompt/permission-mode types,
  * sidechain, synthetic assistant, hard noise tags, interruptions.
  */
 export function isHardNoise(record: RawJsonlRecord): boolean {

@@ -46,7 +46,7 @@ function StatusDot({ isError }: { isError?: boolean }) {
     <span
       className={cn(
         "inline-block h-2 w-2 rounded-full flex-shrink-0",
-        isError ? "bg-accent-red" : "bg-accent-green",
+        isError ? "bg-red-500" : "bg-emerald-500",
       )}
     />
   )
@@ -62,7 +62,7 @@ export function ToolCallItem({ toolCall, className }: ToolCallItemProps) {
       <Collapsible.Trigger
         className={cn(
           "flex w-full items-center gap-2 rounded-md px-3 py-2 text-left",
-          "transition-colors hover:bg-surface-2",
+          "transition-colors hover:bg-muted",
           "cursor-pointer select-none",
           "group/tc",
         )}
@@ -70,7 +70,7 @@ export function ToolCallItem({ toolCall, className }: ToolCallItemProps) {
         {/* Expand chevron */}
         <svg
           className={cn(
-            "h-3.5 w-3.5 flex-shrink-0 text-text-muted transition-transform",
+            "h-3.5 w-3.5 flex-shrink-0 text-muted-foreground transition-transform",
             open && "rotate-90",
           )}
           fill="none"
@@ -88,23 +88,23 @@ export function ToolCallItem({ toolCall, className }: ToolCallItemProps) {
         {/* Tool name badge */}
         <span
           className={cn(
-            "rounded bg-surface-3 px-1.5 py-0.5 text-xs font-medium text-text-secondary",
+            "rounded bg-accent px-1.5 py-0.5 text-xs font-medium text-muted-foreground",
             toolCall.isTask &&
-              "border border-accent-purple/30 bg-accent-purple/10 text-accent-purple",
+              "border border-orange-500/30 bg-orange-500/10 text-orange-500",
           )}
         >
           {toolCall.name}
         </span>
 
         {/* Input summary */}
-        <span className="flex-1 truncate font-mono text-xs text-text-muted">
+        <span className="flex-1 truncate font-mono text-xs text-muted-foreground">
           {inputSummary}
         </span>
 
         {/* Status + expand hint */}
         <div className="flex items-center gap-2">
           {hasResult && <StatusDot isError={toolCall.isError} />}
-          <span className="text-[10px] text-text-muted opacity-0 transition-opacity group-hover/tc:opacity-100">
+          <span className="text-[10px] text-muted-foreground opacity-0 transition-opacity group-hover/tc:opacity-100">
             {open ? "collapse" : "expand"}
           </span>
         </div>
@@ -119,10 +119,10 @@ export function ToolCallItem({ toolCall, className }: ToolCallItemProps) {
         <div className="space-y-2 px-3 pb-3 pt-1">
           {/* Full input */}
           <div>
-            <span className="mb-1 block text-[10px] font-medium uppercase tracking-wider text-text-muted">
+            <span className="mb-1 block text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
               Input
             </span>
-            <pre className="max-h-48 overflow-auto rounded-md bg-surface-3 p-2.5 font-mono text-xs text-text-secondary whitespace-pre-wrap break-all">
+            <pre className="max-h-48 overflow-auto rounded-md bg-accent p-2.5 font-mono text-xs text-muted-foreground whitespace-pre-wrap break-all">
               {JSON.stringify(toolCall.input, null, 2)}
             </pre>
           </div>
@@ -130,15 +130,15 @@ export function ToolCallItem({ toolCall, className }: ToolCallItemProps) {
           {/* Result */}
           {hasResult && (
             <div>
-              <span className="mb-1 flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wider text-text-muted">
+              <span className="mb-1 flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
                 Result
                 {toolCall.isError && (
-                  <span className="rounded bg-accent-red/15 px-1 py-0.5 text-accent-red">
+                  <span className="rounded bg-red-500/15 px-1 py-0.5 text-red-500">
                     error
                   </span>
                 )}
               </span>
-              <pre className="max-h-48 overflow-auto rounded-md bg-surface-3 p-2.5 font-mono text-xs text-text-secondary whitespace-pre-wrap break-all">
+              <pre className="max-h-48 overflow-auto rounded-md bg-accent p-2.5 font-mono text-xs text-muted-foreground whitespace-pre-wrap break-all">
                 {truncateResult(toolCall.result!)}
               </pre>
             </div>
@@ -146,15 +146,15 @@ export function ToolCallItem({ toolCall, className }: ToolCallItemProps) {
 
           {/* Task metadata */}
           {toolCall.isTask && toolCall.taskDescription && (
-            <div className="rounded-md border border-accent-purple/20 bg-accent-purple/5 p-2.5">
-              <span className="mb-1 block text-[10px] font-medium uppercase tracking-wider text-accent-purple">
+            <div className="rounded-md border border-orange-500/20 bg-orange-500/5 p-2.5">
+              <span className="mb-1 block text-[10px] font-medium uppercase tracking-wider text-orange-500">
                 Subagent Task
               </span>
-              <p className="text-xs text-text-secondary">
+              <p className="text-xs text-muted-foreground">
                 {toolCall.taskDescription}
               </p>
               {toolCall.taskSubagentType && (
-                <span className="mt-1 inline-block rounded bg-accent-purple/15 px-1.5 py-0.5 text-[10px] text-accent-purple">
+                <span className="mt-1 inline-block rounded bg-orange-500/15 px-1.5 py-0.5 text-[10px] text-orange-500">
                   {toolCall.taskSubagentType}
                 </span>
               )}
@@ -186,7 +186,7 @@ export function ToolCallList({
 
   return (
     <div className={cn("space-y-0.5", className)}>
-      <span className="mb-1 block px-3 text-[10px] font-medium uppercase tracking-wider text-text-muted">
+      <span className="mb-1 block px-3 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
         Tool Calls ({toolCalls.length})
       </span>
       {visible.map((tc) => (
@@ -196,7 +196,7 @@ export function ToolCallList({
         <button
           type="button"
           onClick={() => setShowAll(true)}
-          className="w-full py-1.5 text-center text-xs text-text-muted transition-colors hover:text-text-secondary"
+          className="w-full py-1.5 text-center text-xs text-muted-foreground transition-colors hover:text-muted-foreground"
         >
           Show {hiddenCount} more tool call{hiddenCount > 1 ? "s" : ""}
         </button>

@@ -72,8 +72,8 @@ export function ErrorFallback({
       </div>
 
       <div className="space-y-1">
-        <h3 className="text-lg font-semibold text-text-primary">{title}</h3>
-        <p className="max-w-md text-sm text-text-muted">
+        <h3 className="text-lg font-semibold text-foreground">{title}</h3>
+        <p className="max-w-md text-sm text-muted-foreground">
           {description ??
             error?.message ??
             "An unexpected error occurred. Try again."}
@@ -84,7 +84,7 @@ export function ErrorFallback({
         <button
           type="button"
           onClick={onRetry}
-          className="inline-flex items-center gap-2 rounded-lg bg-surface-2 px-4 py-2 text-sm font-medium text-text-primary transition-colors hover:bg-surface-3"
+          className="inline-flex items-center gap-2 rounded-lg bg-muted px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
         >
           <RefreshCw className="h-4 w-4" />
           Try again

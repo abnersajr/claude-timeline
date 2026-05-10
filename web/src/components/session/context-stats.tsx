@@ -17,12 +17,12 @@ const CATEGORY_LABELS: Record<ContextCategory, string> = {
 }
 
 const CATEGORY_COLORS: Record<ContextCategory, string> = {
-  "user-message": "bg-brand-400",
-  "tool-output": "bg-accent-purple",
-  "thinking-text": "bg-accent-amber",
-  system: "bg-accent-green",
-  compact: "bg-surface-3",
-  other: "bg-text-muted",
+  "user-message": "bg-blue-500",
+  "tool-output": "bg-violet-500",
+  "thinking-text": "bg-amber-500",
+  system: "bg-slate-400",
+  compact: "bg-accent",
+  other: "bg-muted-foreground",
 }
 
 function CategoryBar({
@@ -39,19 +39,19 @@ function CategoryBar({
 
   return (
     <div className="flex items-center gap-3">
-      <span className="w-28 shrink-0 text-xs text-text-muted">
+      <span className="w-28 shrink-0 text-xs text-muted-foreground">
         {CATEGORY_LABELS[category]}
       </span>
-      <div className="relative h-2 flex-1 overflow-hidden rounded-full bg-surface-3">
+      <div className="relative h-2 flex-1 overflow-hidden rounded-full bg-accent">
         <div
           className={cn("absolute inset-y-0 left-0 rounded-full", CATEGORY_COLORS[category])}
           style={{ width: `${pct.toFixed(1)}%` }}
         />
       </div>
-      <span className="w-16 shrink-0 text-right text-xs font-medium text-text-secondary">
+      <span className="w-16 shrink-0 text-right text-xs font-medium text-muted-foreground">
         {formatTokens(tokens)}
       </span>
-      <span className="w-12 shrink-0 text-right text-xs text-text-muted">
+      <span className="w-12 shrink-0 text-right text-xs text-muted-foreground">
         {pct.toFixed(0)}%
       </span>
     </div>
@@ -67,10 +67,10 @@ function InjectionTimeline({ stats }: { stats: ContextStatsType }) {
 
   return (
     <div>
-      <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-text-muted">
+      <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
         Injection Timeline
       </h4>
-      <div className="relative h-24 overflow-hidden rounded-lg bg-surface-2">
+      <div className="relative h-24 overflow-hidden rounded-lg bg-muted">
         <div className="absolute inset-0 flex items-end">
           {sampled.map((inj) => {
             const heightPct = (inj.inputTokens / maxTokens) * 100
@@ -93,14 +93,14 @@ function InjectionTimeline({ stats }: { stats: ContextStatsType }) {
           return (
             <div
               key={phase.phaseNumber}
-              className="absolute top-0 bottom-0 w-px bg-text-muted/30"
+              className="absolute top-0 bottom-0 w-px bg-muted-foreground/30"
               style={{ left: `${position}%` }}
               title={`Phase ${phase.phaseNumber} starts here`}
             />
           )
         })}
       </div>
-      <div className="mt-1 flex justify-between text-[10px] text-text-muted">
+      <div className="mt-1 flex justify-between text-[10px] text-muted-foreground">
         <span>Start</span>
         <span>{totalInjections} injections across {stats.phaseCount} phase{stats.phaseCount !== 1 ? "s" : ""}</span>
         <span>End</span>
@@ -112,7 +112,7 @@ function InjectionTimeline({ stats }: { stats: ContextStatsType }) {
 function PhaseList({ stats }: { stats: ContextStatsType }) {
   return (
     <div>
-      <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-text-muted">
+      <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
         Phases
       </h4>
       <div className="flex flex-wrap gap-2">
@@ -124,12 +124,12 @@ function PhaseList({ stats }: { stats: ContextStatsType }) {
           return (
             <div
               key={phase.phaseNumber}
-              className="rounded-lg bg-surface-2 px-3 py-2 text-xs"
+              className="rounded-lg bg-muted px-3 py-2 text-xs"
             >
-              <span className="font-medium text-text-secondary">
+              <span className="font-medium text-muted-foreground">
                 Phase {phase.phaseNumber}
               </span>
-              <span className="ml-2 text-text-muted">
+              <span className="ml-2 text-muted-foreground">
                 {formatTokens(phaseTokens)} input · {phaseInjections.length} records
               </span>
             </div>
@@ -149,7 +149,7 @@ export function ContextStats({ stats, className }: ContextStatsProps) {
   return (
     <div
       className={cn(
-        "rounded-xl border border-border bg-surface-1",
+        "rounded-xl border border-border bg-card",
         className,
       )}
     >
@@ -160,16 +160,16 @@ export function ContextStats({ stats, className }: ContextStatsProps) {
         className="flex w-full items-center justify-between p-4 text-left"
       >
         <div className="flex items-center gap-3">
-          <h3 className="text-sm font-semibold uppercase tracking-wider text-text-muted">
+          <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
             Context Stats
           </h3>
-          <span className="text-xs text-text-muted">
+          <span className="text-xs text-muted-foreground">
             {formatTokens(stats.totalInputTokens)} input tokens · {stats.phaseCount} phase{stats.phaseCount !== 1 ? "s" : ""}
           </span>
         </div>
         <svg
           className={cn(
-            "h-4 w-4 text-text-muted transition-transform",
+            "h-4 w-4 text-muted-foreground transition-transform",
             expanded && "rotate-180",
           )}
           fill="none"
@@ -186,7 +186,7 @@ export function ContextStats({ stats, className }: ContextStatsProps) {
         <div className="space-y-4 border-t border-border px-4 pb-4 pt-3">
           {/* Tokens by category */}
           <div>
-            <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-text-muted">
+            <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Tokens by Category
             </h4>
             <div className="space-y-1.5">

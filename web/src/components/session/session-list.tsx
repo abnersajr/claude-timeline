@@ -6,7 +6,7 @@ import { Loader2 } from "lucide-react"
 export function SessionList() {
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ["sessions"],
-    queryFn: () => fetchSessions(50, 0),
+    queryFn: () => fetchSessions(50),
   })
 
   if (isLoading) {
@@ -29,7 +29,7 @@ export function SessionList() {
     )
   }
 
-  const sessions = data?.sessions ?? []
+  const sessions = data ?? []
 
   if (sessions.length === 0) {
     return (
@@ -53,10 +53,12 @@ export function SessionList() {
               Turns
             </th>
             <th className="px-4 py-3 text-right font-medium text-text-primary">
-              Tokens
+              Cost
             </th>
             <th className="px-4 py-3 font-medium text-text-primary">Time</th>
-            <th className="px-4 py-3 font-medium text-text-primary">Status</th>
+            <th className="px-4 py-3 text-right font-medium text-text-primary">
+              Actions
+            </th>
           </tr>
         </thead>
         <tbody>

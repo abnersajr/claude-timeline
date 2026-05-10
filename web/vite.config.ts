@@ -6,9 +6,10 @@ import { defineConfig } from "vite"
 export default defineConfig({
   plugins: [TanStackRouterVite({ quoteStyle: "double" }), tailwindcss(), react()],
   server: {
-    port: 5173,
+    port: 5199,
     strictPort: true,
     host: true,
+    allowedHosts: ["claude-dash.local"],
   },
   resolve: {
     alias: {
