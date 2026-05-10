@@ -7,15 +7,16 @@ import { TokenChart } from "@/components/session/token-chart"
 import { CostBreakdown } from "@/components/session/cost-breakdown"
 import { ContextStats } from "@/components/session/context-stats"
 import { SessionDetailSkeleton } from "@/components/session/skeleton"
+import { ErrorBoundary, ErrorFallback } from "@/components/error-boundary"
 
 export const Route = createFileRoute("/_sessions/$sessionId")({
   component: SessionDetailPage,
 })
 
-function SessionDetailPage() {
+function SessionDetailContent() {
   const { sessionId } = Route.useParams()
 
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["session", sessionId],
     queryFn: () => fetchSession(sessionId),
   })
@@ -25,30 +26,20 @@ function SessionDetailPage() {
   }
 
   if (error) {
+    const isNetworkError =
+      error instanceof TypeError && error.message === "Failed to fetch"
+
     return (
-      <div className="flex flex-col items-center justify-center gap-3 p-12">
-        <div className="rounded-full bg-accent-red/15 p-3">
-          <svg
-            className="h-6 w-6 text-accent-red"
-            fill="none"
-            viewBox="0 0 24 24"
-            strokeWidth={1.5}
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"
-            />
-          </svg>
-        </div>
-        <p className="text-sm font-medium text-text-primary">
-          Failed to load session
-        </p>
-        <p className="text-xs text-text-muted">
-          {error instanceof Error ? error.message : "Unknown error"}
-        </p>
-      </div>
+      <ErrorFallback
+        error={error as Error}
+        onRetry={() => refetch()}
+        title={isNetworkError ? "Cannot reach API" : "Failed to load session"}
+        description={
+          isNetworkError
+            ? "The timeline API server is not responding. Make sure it's running on port 3001."
+            : undefined
+        }
+      />
     )
   }
 
@@ -86,5 +77,13 @@ function SessionDetailPage() {
         </div>
       )}
     </div>
+  )
+}
+
+function SessionDetailPage() {
+  return (
+    <ErrorBoundary>
+      <SessionDetailContent />
+    </ErrorBoundary>
   )
 }

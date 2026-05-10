@@ -1,6 +1,6 @@
 # Local development domain mapping
 # Access the API at https://api.claude-dash.local
-# Access the webapp at https://claude-dash.local (future)
+# Access the webapp at https://claude-dash.local
 #
 # This file is committed to git for team sharing.
 # Each developer needs localias installed: brew install peterldowns/tap/localias
