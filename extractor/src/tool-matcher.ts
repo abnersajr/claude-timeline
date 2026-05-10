@@ -1,3 +1,4 @@
+import { extractToolCalls, formatToolResult } from "./tool-extraction"
 import type { RawJsonlRecord, ToolCall, ToolExecution } from "./types"
 
 /**
@@ -9,18 +10,9 @@ export function collectToolCalls(rawMessages: RawJsonlRecord[]): ToolCall[] {
 
   for (const msg of rawMessages) {
     if (msg.type !== "assistant" || !msg.message?.content) continue
-    if (!Array.isArray(msg.message.content)) continue
 
-    for (const block of msg.message.content) {
-      if (block.type === "tool_use") {
-        toolCalls.push({
-          toolUseId: (block.id ?? block.toolUseId) as string,
-          name: block.name as string,
-          input: block.input as Record<string, unknown>,
-          timestamp: msg.timestamp,
-        })
-      }
-    }
+    const newCalls = extractToolCalls(msg.message.content, msg.timestamp)
+    toolCalls.push(...newCalls)
   }
 
   return toolCalls
@@ -95,16 +87,7 @@ export function buildToolResultMap(
     const toolUseId = result.toolUseId as string | undefined
     if (!toolUseId) continue
 
-    let resultStr: string
-    if (result.stdout !== undefined) {
-      resultStr = String(result.stdout)
-      if (result.stderr) resultStr += `\n[stderr]: ${result.stderr}`
-    } else if (result.questions !== undefined) {
-      resultStr = JSON.stringify({ questions: result.questions, answers: result.answers })
-    } else {
-      resultStr = JSON.stringify(result)
-    }
-
+    const resultStr = formatToolResult(result)
     const isError = Boolean(result.interrupted) || Boolean(result.stderr)
 
     resultMap.set(toolUseId, {

@@ -92,6 +92,7 @@ export function getSession(dbPath: string, sessionId: string): SessionMetadata {
       totalTokens,
       startTime: row.first_timestamp,
       endTime: row.last_timestamp,
+      isOngoing: false,
     }
   } finally {
     db.close()
