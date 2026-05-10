@@ -1,6 +1,7 @@
 packages:
   - 'extractor'
   - 'api'
+  - 'types'
 allowBuilds:
   better-sqlite3: true
   esbuild: true

@@ -9,6 +9,7 @@
     "pnpm": ">=11.0.0"
   },
   "scripts": {
+    "setup": "./scripts/localias-setup.sh",
     "dev": "turbo dev",
     "dev:api": "turbo dev --filter=@timeline/api",
     "build": "turbo build",
@@ -21,6 +22,7 @@
   },
   "workspaces": [
     "extractor",
-    "api"
+    "api",
+    "types"
   ]
 }

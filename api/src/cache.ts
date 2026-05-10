@@ -1,5 +1,5 @@
 import { statSync } from "node:fs"
-import type { FullTimelineSession } from "@timeline/extractor/types"
+import type { FullTimelineSession } from "@timeline/types"
 
 interface CacheEntry {
   data: FullTimelineSession
