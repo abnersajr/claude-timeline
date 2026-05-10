@@ -1,3 +1,4 @@
+import { normalizeModelName } from "./model-parser.js"
 import type { PricingRate, SessionMetadata, SessionPricing, Turn, TurnPricing } from "./types.js"
 
 const PRICING_TABLE: Record<string, PricingRate> = {
@@ -40,9 +41,14 @@ export function getPricing(modelName: string): PricingRate {
 }
 
 /**
- * Calculate per-turn cost breakdown
+ * Calculate per-turn cost breakdown.
+ * Uses turn-level model detection when available, otherwise falls back to session default rate.
  */
-function calculateTurnCost(turn: Turn, rate: PricingRate): TurnPricing {
+function calculateTurnCost(turn: Turn, sessionRate: PricingRate): TurnPricing {
+  const rate = turn.model
+    ? getPricing(normalizeModelName(turn.model))
+    : sessionRate
+
   const inputCost = (turn.tokenUsage.inputTokens / 1_000_000) * rate.inputPerMTok
   const outputCost = (turn.tokenUsage.outputTokens / 1_000_000) * rate.outputPerMTok
   const cacheReadCost = (turn.tokenUsage.cacheReadTokens / 1_000_000) * rate.cacheReadPerMTok

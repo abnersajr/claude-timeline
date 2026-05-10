@@ -1,0 +1,315 @@
+openapi: 3.1.0
+info:
+  title: Claude Code Session Timeline API
+  version: 0.1.0
+  description: API for browsing Claude Code session timelines — health, session list, and full session detail.
+
+security: [] # No auth — local dev API
+
+servers:
+  - url: https://api.claude-dash.local
+    description: localias (HTTPS, proxied)
+  - url: http://localhost:3001
+    description: Direct (local dev)
+
+paths:
+  /api/health:
+    get:
+      operationId: getHealth
+      summary: Health check
+      tags: [System]
+      responses:
+        "200":
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+        "500":
+          description: Service is unhealthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/sessions:
+    get:
+      operationId: listSessions
+      summary: List all sessions
+      description: Returns session summaries sorted by start time (newest first).
+      tags: [Sessions]
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 50
+          description: Max number of sessions to return.
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+          description: Number of sessions to skip (pagination).
+      responses:
+        "200":
+          description: Session list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [sessions, total]
+                properties:
+                  sessions:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/SessionSummary"
+                  total:
+                    type: integer
+                    description: Total number of sessions available.
+        "400":
+          description: Invalid query parameters
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/sessions/{id}:
+    get:
+      operationId: getSession
+      summary: Get full session timeline
+      description: Returns the complete session with turns, pricing, and context stats.
+      tags: [Sessions]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Session UUID.
+      responses:
+        "200":
+          description: Full session detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FullTimelineSession"
+        "400":
+          description: Invalid session ID format
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+components:
+  schemas:
+    TokenUsage:
+      type: object
+      description: Token breakdown per turn.
+      required:
+        - inputTokens
+        - outputTokens
+        - cacheReadTokens
+        - cacheCreation5mTokens
+        - cacheCreation1hTokens
+      properties:
+        inputTokens:
+          type: number
+        outputTokens:
+          type: number
+        cacheReadTokens:
+          type: number
+        cacheCreation5mTokens:
+          type: number
+        cacheCreation1hTokens:
+          type: number
+        cacheCreationTokens:
+          type: number
+          description: Total cache creation tokens (optional, computed).
+
+    TurnPricing:
+      type: object
+      description: Per-turn cost breakdown.
+      required:
+        - inputCost
+        - outputCost
+        - cacheReadCost
+        - cacheCreation5mCost
+        - cacheCreation1hCost
+        - totalCost
+      properties:
+        inputCost:
+          type: number
+        outputCost:
+          type: number
+        cacheReadCost:
+          type: number
+        cacheCreation5mCost:
+          type: number
+        cacheCreation1hCost:
+          type: number
+        totalCost:
+          type: number
+
+    SessionSummary:
+      type: object
+      description: Lightweight session summary for list views.
+      required:
+        - sessionId
+        - projectName
+        - model
+        - workingDirectory
+        - turnCount
+        - totalTokens
+        - startTime
+        - endTime
+        - isOngoing
+        - totalCost
+      properties:
+        sessionId:
+          type: string
+        projectName:
+          type: string
+        model:
+          type: string
+        workingDirectory:
+          type: string
+        turnCount:
+          type: integer
+        totalTokens:
+          $ref: "#/components/schemas/TokenUsage"
+        startTime:
+          type: string
+          format: date-time
+        endTime:
+          type: string
+          format: date-time
+        isOngoing:
+          type: boolean
+        totalCost:
+          type: number
+
+    FullTimelineSession:
+      type: object
+      description: Full session detail with turns, pricing, and context stats.
+      required:
+        - session
+        - turns
+        - pricing
+      properties:
+        session:
+          type: object
+          description: Core session metadata.
+          required:
+            - sessionId
+            - projectName
+            - model
+            - workingDirectory
+            - turnCount
+            - totalTokens
+            - startTime
+            - endTime
+            - isOngoing
+          properties:
+            sessionId:
+              type: string
+            projectName:
+              type: string
+            model:
+              type: string
+            commandExecuted:
+              type: string
+            workingDirectory:
+              type: string
+            turnCount:
+              type: integer
+            totalTokens:
+              $ref: "#/components/schemas/TokenUsage"
+            startTime:
+              type: string
+              format: date-time
+            endTime:
+              type: string
+              format: date-time
+            isOngoing:
+              type: boolean
+        turns:
+          type: array
+          description: Ordered list of conversation turns (schema deferred).
+          items:
+            type: object
+            description: Turn data — detailed schema deferred.
+        pricing:
+          type: object
+          description: Aggregate session pricing breakdown (schema deferred).
+        contextStats:
+          type: object
+          description: Context window usage stats (optional, schema deferred).
+        subagents:
+          type: array
+          description: Subagent sessions spawned during this session (optional).
+          items:
+            type: object
+            description: Subagent data — schema deferred.
+        conversationGroups:
+          type: array
+          description: Grouped conversation turns for display (optional).
+          items:
+            type: object
+            description: Conversation group — schema deferred.
+
+    HealthResponse:
+      type: object
+      description: Health check response.
+      required:
+        - status
+        - version
+        - uptime
+        - timestamp
+      properties:
+        status:
+          type: string
+          enum: [ok, degraded, down]
+        version:
+          type: string
+        uptime:
+          type: number
+          description: Server uptime in seconds.
+        timestamp:
+          type: string
+          format: date-time
+
+    ErrorResponse:
+      type: object
+      description: Standard error response.
+      required:
+        - error
+        - statusCode
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        statusCode:
+          type: integer

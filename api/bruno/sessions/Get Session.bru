@@ -1,0 +1,37 @@
+meta {
+  name: Get Session
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/sessions/{{sessionId}}
+  body: none
+  auth: none
+}
+
+tests {
+  test("returns session with timeline", () => {
+    const data = res.getBody();
+    expect(data).to.have.property("session");
+    expect(data).to.have.property("turns");
+  });
+
+  test("session has required fields", () => {
+    const data = res.getBody();
+    const session = data.session;
+    expect(session).to.have.property("id");
+    expect(session).to.have.property("startedAt");
+    expect(session).to.have.property("endedAt");
+  });
+
+  test("turns is an array", () => {
+    const data = res.getBody();
+    expect(data.turns).to.be.an("array");
+  });
+
+  test("has pricing data", () => {
+    const data = res.getBody();
+    expect(data).to.have.property("pricing");
+  });
+}

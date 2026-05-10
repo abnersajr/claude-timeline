@@ -1,0 +1,37 @@
+{
+  "name": "@timeline/api",
+  "version": "0.1.0",
+  "description": "Timeline API server",
+  "type": "module",
+  "main": "./src/server.ts",
+  "engines": {
+    "node": ">=24.15.0",
+    "pnpm": ">=11.0.0"
+  },
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "lint": "@biomejs/biome check .",
+    "format": "@biomejs/biome format .",
+    "fixtures:seed": "tsx tests/fixtures/seed.ts"
+  },
+  "dependencies": {
+    "@timeline/extractor": "workspace:*",
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.14",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.6",
+    "@types/node": "^22.10.5",
+    "@types/supertest": "^6.0.2",
+    "better-sqlite3": "^11.7.0",
+    "supertest": "^7.0.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3",
+    "vitest": "^3.1.1"
+  }
+}

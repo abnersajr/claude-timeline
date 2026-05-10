@@ -1,0 +1,33 @@
+meta {
+  name: List Sessions
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/sessions?limit=3
+  body: none
+  auth: none
+}
+
+tests {
+  test("returns array", () => {
+    const data = res.getBody();
+    expect(data).to.be.an("array");
+  });
+
+  test("each session has required fields", () => {
+    const data = res.getBody();
+    if (data.length > 0) {
+      const session = data[0];
+      expect(session).to.have.property("id");
+      expect(session).to.have.property("startedAt");
+      expect(session).to.have.property("endedAt");
+    }
+  });
+
+  test("respects limit parameter", () => {
+    const data = res.getBody();
+    expect(data.length).to.be.at.most(3);
+  });
+}
