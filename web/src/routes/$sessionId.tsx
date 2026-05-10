@@ -9,7 +9,7 @@ import { ContextStats } from "@/components/session/context-stats"
 import { SessionDetailSkeleton } from "@/components/session/skeleton"
 import { ErrorBoundary, ErrorFallback } from "@/components/error-boundary"
 
-export const Route = createFileRoute("/_sessions/$sessionId")({
+export const Route = createFileRoute("/$sessionId")({
   component: SessionDetailPage,
 })
 
