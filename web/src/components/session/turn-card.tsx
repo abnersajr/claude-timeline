@@ -85,7 +85,7 @@ function MessagePreview({
           <div
             key={i}
             className={cn(
-              "flex",
+              "flex w-full",
               isUser && "justify-start",
               isAssistant && "justify-end",
               isSystem && "justify-center",
@@ -93,12 +93,12 @@ function MessagePreview({
           >
             <div
               className={cn(
-                "max-w-[70%] rounded-lg px-3 py-2 text-xs",
-                isUser && "bg-blue-500/10",
-                isAssistant && "bg-emerald-500/10",
-                isSystem && "bg-muted max-w-full",
-                // responsive: full width on small screens
-                "max-sm:max-w-full",
+              "w-fit max-w-[60%] rounded-lg px-3 py-2 text-xs",
+              isUser && "bg-blue-500/10",
+              isAssistant && "bg-emerald-500/10",
+              isSystem && "bg-muted max-w-full w-auto",
+              // responsive: full width on small screens
+              "max-sm:max-w-full",
               )}
             >
               {/* Role badge */}
