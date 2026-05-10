@@ -39,6 +39,18 @@ describe("classifier", () => {
       expect(isHardNoise(makeRecord({ type: "queue-operation" }))).toBe(true)
     })
 
+    it("returns true for attachment type", () => {
+      expect(isHardNoise(makeRecord({ type: "attachment" }))).toBe(true)
+    })
+
+    it("returns true for last-prompt type", () => {
+      expect(isHardNoise(makeRecord({ type: "last-prompt" }))).toBe(true)
+    })
+
+    it("returns true for permission-mode type", () => {
+      expect(isHardNoise(makeRecord({ type: "permission-mode" }))).toBe(true)
+    })
+
     it("returns true for sidechain messages", () => {
       expect(isHardNoise(makeRecord({ isSidechain: true }))).toBe(true)
     })
@@ -222,6 +234,9 @@ describe("classifier", () => {
       expect(classifyMessage(makeRecord({ type: "summary" }))).toBe("hardNoise")
       expect(classifyMessage(makeRecord({ type: "file-history-snapshot" }))).toBe("hardNoise")
       expect(classifyMessage(makeRecord({ type: "queue-operation" }))).toBe("hardNoise")
+      expect(classifyMessage(makeRecord({ type: "attachment" }))).toBe("hardNoise")
+      expect(classifyMessage(makeRecord({ type: "last-prompt" }))).toBe("hardNoise")
+      expect(classifyMessage(makeRecord({ type: "permission-mode" }))).toBe("hardNoise")
     })
 
     it("classifies sidechain as hardNoise", () => {

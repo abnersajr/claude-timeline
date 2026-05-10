@@ -1,9 +1,14 @@
-# Local development domain mapping
-# Access the API at https://api.claude-dash.local
-# Access the webapp at https://claude-dash.local
+# localias config file syntax
 #
-# This file is committed to git for team sharing.
-# Each developer needs localias installed: brew install peterldowns/tap/localias
-
-api.claude-dash.local: 3001
-claude-dash.local: 5173
+# 	alias: port
+#
+# for example,
+#
+#   bareTLD: 9003 # serves over https and http
+#   implicitly_secure.test: 9002 # serves over https and http
+#   https://explicit_secure.test: 9000 # serves over https and http
+#   http://explicit_insecure.test: 9001 # serves over http only
+#
+api.claude-dash.local: 3099
+claude-dash.local: 5199
+memo.local: 5173

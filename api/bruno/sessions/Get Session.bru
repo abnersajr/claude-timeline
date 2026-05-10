@@ -10,13 +10,17 @@ get {
   auth: none
 }
 
+vars:pre-request {
+  sessionId: 19500eaa-3cc6-4111-a82d-f158e7f76ad3
+}
+
 tests {
   test("returns session with timeline", () => {
     const data = res.getBody();
     expect(data).to.have.property("session");
     expect(data).to.have.property("turns");
   });
-
+  
   test("session has required fields", () => {
     const data = res.getBody();
     const session = data.session;
@@ -24,12 +28,12 @@ tests {
     expect(session).to.have.property("startedAt");
     expect(session).to.have.property("endedAt");
   });
-
+  
   test("turns is an array", () => {
     const data = res.getBody();
     expect(data.turns).to.be.an("array");
   });
-
+  
   test("has pricing data", () => {
     const data = res.getBody();
     expect(data).to.have.property("pricing");

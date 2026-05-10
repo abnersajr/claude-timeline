@@ -1,9 +1,0 @@
-{
-  "variables": [
-    {
-      "name": "baseUrl",
-      "value": "http://api.claude-dash.local:3001",
-      "enabled": true
-    }
-  ]
-}

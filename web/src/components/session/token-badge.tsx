@@ -13,10 +13,10 @@ interface TokenBadgeProps {
 }
 
 const categoryStyles: Record<TokenCategory, string> = {
-  input: "bg-accent-blue/15 text-accent-blue",
-  output: "bg-accent-green/15 text-accent-green",
-  "cache-read": "bg-accent-amber/15 text-accent-amber",
-  "cache-write": "bg-accent-purple/15 text-accent-purple",
+  input: "bg-blue-500/15 text-blue-400",
+  output: "bg-emerald-500/15 text-emerald-400",
+  "cache-read": "bg-amber-500/15 text-amber-400",
+  "cache-write": "bg-violet-500/15 text-violet-400",
 }
 
 const categoryLabels: Record<TokenCategory, string> = {

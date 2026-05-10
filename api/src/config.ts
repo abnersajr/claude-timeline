@@ -33,7 +33,7 @@ export function loadConfig(): Config {
 
   const corsOrigins = process.env.CORS_ORIGIN
     ? process.env.CORS_ORIGIN.split(",").map((s) => s.trim())
-    : file.corsOrigins ?? ["https://claude-dash.local", "http://localhost:5173"]
+    : file.corsOrigins ?? ["https://claude-dash.local", "http://localhost:5199"]
 
   const dbPath = process.env.CLAUDE_DB_PATH ?? file.dbPath ?? getDbPath()
   const projectsDir = process.env.CLAUDE_PROJECTS_DIR ?? file.projectsDir ?? getProjectsDir()

@@ -15,14 +15,14 @@ interface StatItemProps {
 
 function StatItem({ label, value, accent }: StatItemProps) {
   return (
-    <div className="flex flex-col gap-1 rounded-lg bg-surface-2 p-3">
-      <span className="text-xs font-medium uppercase tracking-wider text-text-muted">
+    <div className="flex flex-col gap-1 rounded-lg bg-muted p-3">
+      <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
         {label}
       </span>
       <span
         className={cn(
-          "text-sm font-semibold text-text-primary",
-          accent && "text-brand-400",
+          "text-sm font-semibold text-foreground",
+          accent && "text-primary",
         )}
       >
         {value}
@@ -43,21 +43,21 @@ export function OverviewCard({ session, pricing, className }: OverviewCardProps)
   return (
     <div
       className={cn(
-        "rounded-xl border border-border bg-surface-1 p-6",
+        "rounded-xl border border-border bg-card p-6",
         className,
       )}
     >
       {/* Header */}
       <div className="mb-5 flex items-center justify-between">
-        <h2 className="text-lg font-bold text-text-primary">
+        <h2 className="text-lg font-bold text-foreground">
           {session.projectName}
         </h2>
         <span
           className={cn(
             "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium",
             session.isOngoing
-              ? "bg-accent-green/15 text-accent-green"
-              : "bg-surface-3 text-text-secondary",
+              ? "bg-emerald-500/15 text-emerald-400"
+              : "bg-accent text-muted-foreground",
           )}
         >
           {session.isOngoing ? "Ongoing" : "Completed"}
@@ -86,20 +86,20 @@ export function OverviewCard({ session, pricing, className }: OverviewCardProps)
       </div>
 
       {/* Working directory */}
-      <div className="mt-4 flex items-center gap-2 text-xs text-text-muted">
+      <div className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
         <span className="font-medium">Working Directory:</span>
-        <code className="rounded bg-surface-3 px-1.5 py-0.5 font-mono text-text-secondary">
+        <code className="rounded bg-accent px-1.5 py-0.5 font-mono text-muted-foreground">
           {session.workingDirectory}
         </code>
       </div>
 
       {/* Time range */}
-      <div className="mt-2 flex items-center gap-4 text-xs text-text-muted">
+      <div className="mt-2 flex items-center gap-4 text-xs text-muted-foreground">
         <span>
-          Started: <span className="text-text-secondary">{formatDate(session.startTime)}</span>
+          Started: <span className="text-muted-foreground">{formatDate(session.startTime)}</span>
         </span>
         <span>
-          Ended: <span className="text-text-secondary">{formatDate(session.endTime)}</span>
+          Ended: <span className="text-muted-foreground">{formatDate(session.endTime)}</span>
         </span>
       </div>
     </div>

@@ -5,7 +5,7 @@ const HARD_NOISE_TAGS = ["<local-command-caveat>", "<system-reminder>"]
 const COMMAND_OUTPUT_TAGS = ["<local-command-stdout>", "<local-command-stderr>"]
 
 /** Entry types that are always noise */
-const NOISE_TYPES = new Set(["system", "summary", "file-history-snapshot", "queue-operation"])
+const NOISE_TYPES = new Set(["system", "summary", "file-history-snapshot", "queue-operation", "attachment", "last-prompt", "permission-mode"])
 
 /**
  * Check if a JSONL entry should be displayed/processed.

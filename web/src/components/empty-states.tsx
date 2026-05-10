@@ -26,20 +26,20 @@ export function EmptyState({
 
   return (
     <div className="flex flex-col items-center justify-center gap-4 p-16 text-center">
-      <div className="rounded-full bg-surface-2 p-4">
-        <Icon className="h-8 w-8 text-text-muted" />
+      <div className="rounded-full bg-muted p-4">
+        <Icon className="h-8 w-8 text-muted-foreground" />
       </div>
 
       <div className="space-y-1">
-        <h3 className="text-base font-semibold text-text-primary">{title}</h3>
-        <p className="max-w-sm text-sm text-text-muted">{description}</p>
+        <h3 className="text-base font-semibold text-foreground">{title}</h3>
+        <p className="max-w-sm text-sm text-muted-foreground">{description}</p>
       </div>
 
       {action && (
         <button
           type="button"
           onClick={action.onClick}
-          className="rounded-lg bg-surface-2 px-4 py-2 text-sm font-medium text-text-primary transition-colors hover:bg-surface-3"
+          className="rounded-lg bg-muted px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
         >
           {action.label}
         </button>

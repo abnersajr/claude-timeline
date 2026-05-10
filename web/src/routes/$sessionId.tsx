@@ -45,7 +45,7 @@ function SessionDetailContent() {
 
   if (!data) {
     return (
-      <div className="p-12 text-center text-text-muted">
+      <div className="p-12 text-center text-muted-foreground">
         No data returned for session {sessionId}.
       </div>
     )
@@ -61,21 +61,13 @@ function SessionDetailContent() {
         <CostBreakdown pricing={data.pricing} turns={data.turns} />
       </div>
 
-      <Timeline turns={data.turns} turnsPricing={data.pricing.turnsPricing} />
+      <Timeline
+        turns={data.turns}
+        turnsPricing={data.pricing.turnsPricing}
+        subagents={data.subagents}
+      />
 
       {data.contextStats && <ContextStats stats={data.contextStats} />}
-
-      {/* Subagents placeholder — will be wired in Task 11 */}
-      {data.subagents && data.subagents.length > 0 && (
-        <div className="rounded-lg border border-border bg-surface-1 p-4">
-          <h3 className="text-sm font-semibold uppercase tracking-wider text-text-muted">
-            Subagents ({data.subagents.length})
-          </h3>
-          <p className="mt-2 text-xs text-text-muted">
-            Subagent details coming soon.
-          </p>
-        </div>
-      )}
     </div>
   )
 }
