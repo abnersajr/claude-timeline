@@ -16,7 +16,7 @@ echo "✅ Localias daemon is running"
 echo ""
 echo "🌐 Starting services..."
 echo "   API:      https://api.claude-dash.local → localhost:3001"
-echo "   Webapp:   https://claude-dash.local → localhost:5173 (future)"
+echo "   Webapp:   https://claude-dash.local → localhost:5173"
 echo ""
 
 exec pnpm dev

@@ -149,7 +149,7 @@ summary() {
   echo -e "${BOLD}${GREEN}═══════════════════════════════════════${NC}"
   echo ""
   echo -e "  ${BOLD}API:${NC}      https://api.claude-dash.local"
-  echo -e "  ${BOLD}Webapp:${NC}   https://claude-dash.local (future)"
+  echo -e "  ${BOLD}Webapp:${NC}   https://claude-dash.local"
   echo -e "  ${BOLD}Backup:${NC}   http://localhost:3001"
   echo ""
   echo -e "  ${DIM}Run 'pnpm dev' to start all services.${NC}"
