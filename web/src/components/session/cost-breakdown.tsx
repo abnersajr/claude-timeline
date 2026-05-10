@@ -2,9 +2,8 @@ import type {
   Turn,
   TurnPricing,
   SessionPricing,
-  PricingRate,
 } from "@timeline/types"
-import { cn, formatCost, formatTokens } from "@/lib/utils"
+import { cn, formatCost } from "@/lib/utils"
 
 // ---------------------------------------------------------------------------
 // Types

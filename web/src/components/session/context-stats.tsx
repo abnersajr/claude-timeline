@@ -72,7 +72,7 @@ function InjectionTimeline({ stats }: { stats: ContextStatsType }) {
       </h4>
       <div className="relative h-24 overflow-hidden rounded-lg bg-surface-2">
         <div className="absolute inset-0 flex items-end">
-          {sampled.map((inj, i) => {
+          {sampled.map((inj) => {
             const heightPct = (inj.inputTokens / maxTokens) * 100
             return (
               <div
