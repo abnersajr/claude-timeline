@@ -39,12 +39,12 @@ function MessagePreview({
                   ? "bg-accent-blue/15 text-accent-blue"
                   : msg.type === "assistant"
                     ? "bg-accent-green/15 text-accent-green"
-                    : "bg-surface-3 text-text-muted",
+                    : "bg-surface-3 text-muted-foreground",
               )}
             >
               {msg.type === "user" ? "U" : msg.type === "assistant" ? "A" : "S"}
             </span>
-            <p className="min-w-0 flex-1 truncate text-xs text-text-secondary">
+            <p className="min-w-0 flex-1 truncate text-xs text-secondary-foreground">
               {preview}
               {!expanded && preview.length >= 120 && "…"}
             </p>
@@ -55,7 +55,7 @@ function MessagePreview({
         <button
           type="button"
           onClick={() => setExpanded(true)}
-          className="text-xs text-text-muted transition-colors hover:text-text-secondary"
+          className="text-xs text-muted-foreground transition-colors hover:text-secondary-foreground"
         >
           +{hiddenCount} more message{hiddenCount > 1 ? "s" : ""}
         </button>
@@ -76,7 +76,7 @@ function ToolCallPills({ toolCalls }: { toolCalls: Turn["toolCalls"] }) {
         <span
           key={tc.toolUseId}
           className={cn(
-            "rounded bg-surface-3 px-1.5 py-0.5 text-[10px] text-text-secondary",
+            "rounded bg-surface-3 px-1.5 py-0.5 text-[10px] text-secondary-foreground",
             tc.isTask &&
               "border border-accent-purple/30 bg-accent-purple/10 text-accent-purple",
           )}
@@ -85,7 +85,7 @@ function ToolCallPills({ toolCalls }: { toolCalls: Turn["toolCalls"] }) {
         </span>
       ))}
       {hidden > 0 && (
-        <span className="text-[10px] text-text-muted">
+        <span className="text-[10px] text-muted-foreground">
           +{hidden} more
         </span>
       )}
@@ -110,16 +110,16 @@ export function TurnCard({ turn, pricing, index, className }: TurnCardProps) {
       <div className="flex items-center justify-between border-b border-border/50 px-4 py-3">
         <div className="flex items-center gap-3">
           {/* Turn number badge */}
-          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-surface-3 text-xs font-bold text-text-muted">
+          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-surface-3 text-xs font-bold text-muted-foreground">
             {index + 1}
           </span>
 
           <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-text-primary">
+            <span className="text-sm font-medium text-foreground">
               Turn {index + 1}
             </span>
             {turn.model && (
-              <span className="rounded bg-surface-2 px-1.5 py-0.5 text-[10px] text-text-muted">
+              <span className="rounded bg-surface-2 px-1.5 py-0.5 text-[10px] text-muted-foreground">
                 {turn.model}
               </span>
             )}
@@ -134,7 +134,7 @@ export function TurnCard({ turn, pricing, index, className }: TurnCardProps) {
             </span>
           )}
           {/* Timestamp */}
-          <span className="text-xs text-text-muted">
+          <span className="text-xs text-muted-foreground">
             {formatTimestamp(turn.timestamp)}
           </span>
         </div>
@@ -155,10 +155,10 @@ export function TurnCard({ turn, pricing, index, className }: TurnCardProps) {
                 className="w-full text-left"
               >
                 <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-medium uppercase tracking-wider text-text-muted">
+                  <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
                     Tool Calls ({toolCallCount})
                   </span>
-                  <span className="text-[10px] text-text-muted">
+                  <span className="text-[10px] text-muted-foreground">
                     · click to expand
                   </span>
                 </div>
@@ -171,7 +171,7 @@ export function TurnCard({ turn, pricing, index, className }: TurnCardProps) {
                 <button
                   type="button"
                   onClick={() => setShowToolDetails(false)}
-                  className="mb-1 text-[10px] font-medium uppercase tracking-wider text-text-muted transition-colors hover:text-text-secondary"
+                  className="mb-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground transition-colors hover:text-secondary-foreground"
                 >
                   Collapse tool calls
                 </button>
@@ -191,7 +191,7 @@ export function TurnCard({ turn, pricing, index, className }: TurnCardProps) {
           cacheCreationTokens={turn.cacheCreationTokensThisTurn}
         />
         {messageCount > 0 && (
-          <span className="text-[10px] text-text-muted">
+          <span className="text-[10px] text-muted-foreground">
             {messageCount} message{messageCount !== 1 ? "s" : ""}
           </span>
         )}
