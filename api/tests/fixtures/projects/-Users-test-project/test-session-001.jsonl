@@ -1,0 +1,7 @@
+{"type":"user","timestamp":"2026-01-15T10:00:00.000Z","message":{"role":"user","content":[{"type":"text","text":"Hello, help me with this code."}]}}
+{"type":"assistant","timestamp":"2026-01-15T10:00:01.000Z","message":{"role":"assistant","model":"claude-sonnet-4-20250514","content":[{"type":"text","text":"I'll help you with that."}],"usage":{"input_tokens":2000,"output_tokens":800,"cache_read_input_tokens":0,"cache_creation":{"ephemeral_5m_input_tokens":500,"ephemeral_1h_input_tokens":0}}}}
+{"type":"user","timestamp":"2026-01-15T10:02:30.000Z","message":{"role":"user","content":[{"type":"text","text":"Now read the file."}]}}
+{"type":"assistant","timestamp":"2026-01-15T10:02:31.000Z","message":{"role":"assistant","model":"claude-sonnet-4-20250514","content":[{"type":"tool_use","id":"tu_001","name":"Read","input":{"file_path":"/test.ts"}}],"usage":{"input_tokens":1500,"output_tokens":600,"cache_read_input_tokens":500}}}
+{"type":"tool_result","timestamp":"2026-01-15T10:02:32.000Z","toolUseResult":{"toolUseId":"tu_001","content":"file contents here","isError":false}}
+{"type":"user","timestamp":"2026-01-15T10:05:00.000Z","message":{"role":"user","content":[{"type":"text","text":"Now write the fix."}]}}
+{"type":"assistant","timestamp":"2026-01-15T10:05:01.000Z","message":{"role":"assistant","model":"claude-sonnet-4-20250514","content":[{"type":"tool_use","id":"tu_002","name":"Write","input":{"file_path":"/test.ts","content":"fixed"}}],"usage":{"input_tokens":1500,"output_tokens":600,"cache_read_input_tokens":500}}}

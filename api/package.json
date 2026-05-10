@@ -13,7 +13,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "lint": "@biomejs/biome check .",
-    "format": "@biomejs/biome format ."
+    "format": "@biomejs/biome format .",
+    "fixtures:seed": "tsx tests/fixtures/seed.ts"
   },
   "dependencies": {
     "@timeline/extractor": "workspace:*",
