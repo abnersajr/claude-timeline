@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query"
 import { fetchSession } from "@/lib/api"
 import { OverviewCard } from "@/components/session/overview-card"
 import { Timeline } from "@/components/session/timeline"
+import { ContextStats } from "@/components/session/context-stats"
 import { SessionDetailSkeleton } from "@/components/session/skeleton"
 
 export const Route = createFileRoute("/_sessions/$sessionId")({
@@ -61,6 +62,8 @@ function SessionDetailPage() {
     <div className="space-y-6 p-6">
       <OverviewCard session={data.session} pricing={data.pricing} />
       <Timeline turns={data.turns} turnsPricing={data.pricing.turnsPricing} />
+
+      {data.contextStats && <ContextStats stats={data.contextStats} />}
 
       {/* Subagents placeholder — will be wired in Task 11 */}
       {data.subagents && data.subagents.length > 0 && (
