@@ -6,7 +6,11 @@ settings:
 
 importers:
 
-  .: {}
+  .:
+    devDependencies:
+      turbo:
+        specifier: ^2
+        version: 2.9.11
 
   api:
     dependencies:
@@ -446,6 +450,36 @@ packages:
   '@rollup/rollup-win32-x64-msvc@4.60.3':
     resolution: {integrity: sha512-hPt/bgL5cE+Qp+/TPHBqptcAgPzgj46mPcg/16zNUmbQk0j+mOEQV/+Lqu8QRtDV3Ek95Q6FeFITpuhl6OTsAA==}
     cpu: [x64]
+    os: [win32]
+
+  '@turbo/darwin-64@2.9.11':
+    resolution: {integrity: sha512-bL9Bc6q1xoXXQEpsKZE8fRggMyktiMPbPCnmBmbLpkK5v00X1ffQHzaR7obOSENTZj895W6dE5UhDiQISim7dQ==}
+    cpu: [x64]
+    os: [darwin]
+
+  '@turbo/darwin-arm64@2.9.11':
+    resolution: {integrity: sha512-LjSW6JOZq9wsmDTeFdfpD8vjAK9AC4UVGTvuxSkKz70ykVAJ21d+ek997PFdMVvMqJjOWn2qGGe+iT6Lcuwuag==}
+    cpu: [arm64]
+    os: [darwin]
+
+  '@turbo/linux-64@2.9.11':
+    resolution: {integrity: sha512-xSUU3bo1ot2P8x/KetHgk1GLEa+uJjwzSR0oM0tpK2yz5M8g3fRVyEPe26pA/W3LQ3hpX3pJYX+QkILI1H3zjQ==}
+    cpu: [x64]
+    os: [linux]
+
+  '@turbo/linux-arm64@2.9.11':
+    resolution: {integrity: sha512-hlBrHN0XzrBRWuZaVrYZssKyqHN8xpz5UfuvBVStaPmprLLmS/Q8hB8ZF6GJEE69IGlVZusiGz25aiq9g+ScGw==}
+    cpu: [arm64]
+    os: [linux]
+
+  '@turbo/windows-64@2.9.11':
+    resolution: {integrity: sha512-b4IVTby0je7CmqokMS3UaeF09PATwHkka1A75Sq7e0YgY56i0lHGXDyENpwEHZKNKLzPnpMKQ3JQM8cg1+F35Q==}
+    cpu: [x64]
+    os: [win32]
+
+  '@turbo/windows-arm64@2.9.11':
+    resolution: {integrity: sha512-2fbUUcwaP2cbbcJWrZjk2cc5xl7zZyfdpEf8/S9tsd9ZqHYVyP69ENXYRmX8W+BeUrKtPnLG3ex/E9bagzVr/A==}
+    cpu: [arm64]
     os: [win32]
 
   '@types/better-sqlite3@7.6.13':
@@ -1106,6 +1140,10 @@ packages:
   tunnel-agent@0.6.0:
     resolution: {integrity: sha512-McnNiV1l8RYeY8tBgEpuodCC1mLUdbSN+CYBL7kJsJNInOP8UjDDEwdk6Mw60vdLLrr5NHKZhMAOSrR2NZuQ+w==}
 
+  turbo@2.9.11:
+    resolution: {integrity: sha512-4+0uFViM8ORa6hT1eLZLZRRPZaoywvpHQRgvLH/Q2uq5nLKKRPUiDeBEuYZmknkDYAZYc1yJuYJapk3ej9cUVw==}
+    hasBin: true
+
   type-is@2.0.1:
     resolution: {integrity: sha512-OZs6gsjF4vMp32qrCbiVSkrFmXtG/AZhY3t0iAMrMBiAZyV9oALtXO8hsrHbMXF9x6L3grlFuwW2oAz7cav+Gw==}
     engines: {node: '>= 0.6'}
@@ -1409,6 +1447,24 @@ snapshots:
     optional: true
 
   '@rollup/rollup-win32-x64-msvc@4.60.3':
+    optional: true
+
+  '@turbo/darwin-64@2.9.11':
+    optional: true
+
+  '@turbo/darwin-arm64@2.9.11':
+    optional: true
+
+  '@turbo/linux-64@2.9.11':
+    optional: true
+
+  '@turbo/linux-arm64@2.9.11':
+    optional: true
+
+  '@turbo/windows-64@2.9.11':
+    optional: true
+
+  '@turbo/windows-arm64@2.9.11':
     optional: true
 
   '@types/better-sqlite3@7.6.13':
@@ -2180,6 +2236,15 @@ snapshots:
   tunnel-agent@0.6.0:
     dependencies:
       safe-buffer: 5.2.1
+
+  turbo@2.9.11:
+    optionalDependencies:
+      '@turbo/darwin-64': 2.9.11
+      '@turbo/darwin-arm64': 2.9.11
+      '@turbo/linux-64': 2.9.11
+      '@turbo/linux-arm64': 2.9.11
+      '@turbo/windows-64': 2.9.11
+      '@turbo/windows-arm64': 2.9.11
 
   type-is@2.0.1:
     dependencies:
