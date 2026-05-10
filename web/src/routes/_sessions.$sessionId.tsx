@@ -3,6 +3,8 @@ import { useQuery } from "@tanstack/react-query"
 import { fetchSession } from "@/lib/api"
 import { OverviewCard } from "@/components/session/overview-card"
 import { Timeline } from "@/components/session/timeline"
+import { TokenChart } from "@/components/session/token-chart"
+import { CostBreakdown } from "@/components/session/cost-breakdown"
 import { ContextStats } from "@/components/session/context-stats"
 import { SessionDetailSkeleton } from "@/components/session/skeleton"
 
@@ -61,6 +63,13 @@ function SessionDetailPage() {
   return (
     <div className="space-y-6 p-6">
       <OverviewCard session={data.session} pricing={data.pricing} />
+
+      {/* Token chart + Cost breakdown side by side on wide screens */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <TokenChart turns={data.turns} />
+        <CostBreakdown pricing={data.pricing} turns={data.turns} />
+      </div>
+
       <Timeline turns={data.turns} turnsPricing={data.pricing.turnsPricing} />
 
       {data.contextStats && <ContextStats stats={data.contextStats} />}
