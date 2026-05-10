@@ -1,0 +1,37 @@
+@import "tailwindcss";
+
+@theme {
+  /* Brand colors */
+  --color-brand-50: oklch(0.97 0.02 250);
+  --color-brand-100: oklch(0.93 0.04 250);
+  --color-brand-200: oklch(0.87 0.07 250);
+  --color-brand-300: oklch(0.78 0.1 250);
+  --color-brand-400: oklch(0.68 0.14 250);
+  --color-brand-500: oklch(0.58 0.16 250);
+  --color-brand-600: oklch(0.48 0.16 250);
+  --color-brand-700: oklch(0.40 0.14 250);
+  --color-brand-800: oklch(0.33 0.11 250);
+  --color-brand-900: oklch(0.27 0.08 250);
+  --color-brand-950: oklch(0.21 0.05 250);
+
+  /* Surface colors (dark theme) */
+  --color-surface-0: oklch(0.13 0.005 250);
+  --color-surface-1: oklch(0.16 0.005 250);
+  --color-surface-2: oklch(0.19 0.005 250);
+  --color-surface-3: oklch(0.22 0.005 250);
+  --color-surface-4: oklch(0.25 0.005 250);
+
+  /* Accent colors */
+  --color-accent-green: oklch(0.72 0.17 155);
+  --color-accent-orange: oklch(0.75 0.15 60);
+  --color-accent-red: oklch(0.65 0.2 25);
+  --color-accent-blue: oklch(0.65 0.15 250);
+  --color-accent-purple: oklch(0.65 0.15 300);
+
+  /* Semantic colors */
+  --color-text-primary: oklch(0.93 0.01 250);
+  --color-text-secondary: oklch(0.65 0.01 250);
+  --color-text-muted: oklch(0.50 0.01 250);
+  --color-border: oklch(0.25 0.005 250);
+  --color-border-subtle: oklch(0.20 0.005 250);
+}
