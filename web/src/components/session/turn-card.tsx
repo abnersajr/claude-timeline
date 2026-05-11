@@ -4,7 +4,7 @@ import { useState } from "react"
 import type { Turn, TurnPricing } from "@timeline/types"
 import { cn, formatCost, formatTimestamp } from "@/lib/utils"
 import { TokenBadgeGroup } from "./token-badge"
-import { ToolCallList } from "./tool-call"
+import { ToolCallList, ToolCallPills } from "./tool-call"
 
 interface TurnCardProps {
   turn: Turn
@@ -24,29 +24,29 @@ function ThinkingBlock({ text }: { text: string }) {
         <button
           type="button"
           onClick={() => setExpanded(!expanded)}
-          className="flex items-center gap-1 text-[10px] text-amber-400/80"
+          className="flex items-center gap-1 text-[0.625rem] text-amber-400/80"
         >
           💭 Thinking
-          <span className="text-[8px]">{expanded ? "▼" : "▶"}</span>
+          <span className="text-[0.5rem]">{expanded ? "▼" : "▶"}</span>
         </button>
         <div className="relative">
           <button
             type="button"
             onMouseEnter={() => setShowHelp(true)}
             onMouseLeave={() => setShowHelp(false)}
-            className="flex h-4 w-4 items-center justify-center rounded-full bg-amber-500/20 text-[8px] text-amber-400"
+            className="flex h-4 w-4 items-center justify-center rounded-full bg-amber-500/20 text-[0.5rem] text-amber-400"
           >
             ?
           </button>
           {showHelp && (
-            <div className="absolute bottom-full left-0 z-50 mb-1 w-48 rounded border border-border bg-card p-2 text-[10px] text-muted-foreground shadow-lg">
+            <div className="absolute bottom-full left-0 z-50 mb-1 w-48 rounded border border-border bg-card p-2 text-[0.625rem] text-muted-foreground shadow-lg">
               Internal model reasoning — not visible to users. Click to expand.
             </div>
           )}
         </div>
       </div>
       {expanded && (
-        <pre className="max-h-48 overflow-auto border-t border-amber-500/10 bg-amber-500/5 p-2 font-mono text-[10px] text-amber-200/70 whitespace-pre-wrap">
+        <pre className="max-h-48 overflow-auto border-t border-amber-500/10 bg-amber-500/5 p-2 font-mono text-[0.625rem] text-amber-200/70 whitespace-pre-wrap">
           {text}
         </pre>
       )}
@@ -104,7 +104,7 @@ function MessagePreview({
               {/* Role badge */}
               <div
                 className={cn(
-                  "mb-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium",
+                  "mb-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[0.625rem] font-medium",
                   isUser && "bg-blue-500/20 text-blue-200",
                   isAssistant && "bg-emerald-500/20 text-emerald-200",
                   isSystem && "bg-muted text-muted-foreground",
@@ -142,35 +142,6 @@ function MessagePreview({
   )
 }
 
-/** Tool call name pills shown in collapsed state */
-function ToolCallPills({ toolCalls }: { toolCalls: Turn["toolCalls"] }) {
-  const maxShow = 6
-  const visible = toolCalls.slice(0, maxShow)
-  const hidden = toolCalls.length - maxShow
-
-  return (
-    <div className="flex flex-wrap gap-1">
-      {visible.map((tc) => (
-        <span
-          key={tc.toolUseId}
-          className={cn(
-            "rounded bg-orange-500/10 px-1.5 py-0.5 text-[10px] text-orange-400",
-            tc.isTask &&
-              "border border-violet-500/30 bg-violet-500/10 text-violet-400",
-          )}
-        >
-          {tc.name}
-        </span>
-      ))}
-      {hidden > 0 && (
-        <span className="text-[10px] text-muted-foreground">
-          +{hidden} more
-        </span>
-      )}
-    </div>
-  )
-}
-
 export function TurnCard({ turn, pricing, index, className }: TurnCardProps) {
   const [showToolDetails, setShowToolDetails] = useState(false)
   const toolCallCount = turn.toolCalls.length
@@ -197,7 +168,7 @@ export function TurnCard({ turn, pricing, index, className }: TurnCardProps) {
               Turn {index + 1}
             </span>
             {turn.model && (
-              <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+              <span className="rounded bg-muted px-1.5 py-0.5 text-[0.625rem] text-muted-foreground">
                 {turn.model}
               </span>
             )}
@@ -233,10 +204,10 @@ export function TurnCard({ turn, pricing, index, className }: TurnCardProps) {
                 className="w-full text-left"
               >
                 <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                  <span className="text-[0.625rem] font-medium uppercase tracking-wider text-muted-foreground">
                     Tool Calls ({toolCallCount})
                   </span>
-                  <span className="text-[10px] text-muted-foreground">
+                  <span className="text-[0.625rem] text-muted-foreground">
                     · click to expand
                   </span>
                 </div>
@@ -249,7 +220,7 @@ export function TurnCard({ turn, pricing, index, className }: TurnCardProps) {
                 <button
                   type="button"
                   onClick={() => setShowToolDetails(false)}
-                  className="mb-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground transition-colors hover:text-foreground"
+                  className="mb-2 text-[0.625rem] font-medium uppercase tracking-wider text-muted-foreground transition-colors hover:text-foreground"
                 >
                   Collapse tool calls
                 </button>
@@ -269,7 +240,7 @@ export function TurnCard({ turn, pricing, index, className }: TurnCardProps) {
           cacheCreationTokens={turn.cacheCreationTokensThisTurn}
         />
         {messageCount > 0 && (
-          <span className="text-[10px] text-muted-foreground">
+          <span className="text-[0.625rem] text-muted-foreground">
             {messageCount} message{messageCount !== 1 ? "s" : ""}
           </span>
         )}

@@ -12,7 +12,7 @@ export function formatTokens(n: number): string {
 }
 
 export function formatCost(n: number): string {
-  return `$${n.toFixed(4)}`
+  return `$${n.toFixed(3)}`
 }
 
 export function formatDuration(ms: number): string {

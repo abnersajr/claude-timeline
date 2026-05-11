@@ -27,6 +27,10 @@ export class SessionCache {
     this.cache.set(sessionId, { data, mtimeMs })
   }
 
+  delete(sessionId: string): void {
+    this.cache.delete(sessionId)
+  }
+
   clear(): void {
     this.cache.clear()
   }

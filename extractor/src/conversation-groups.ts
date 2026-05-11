@@ -41,6 +41,13 @@ export function buildConversationGroups(turns: Turn[]): ConversationGroup[] {
 
       // Process tool calls from the user turn (e.g. Task calls)
       collectToolCalls(currentGroup, turn)
+
+      // Aggregate user turn token usage
+      currentGroup.tokenUsage.inputTokens += turn.tokenUsage.inputTokens
+      currentGroup.tokenUsage.outputTokens += turn.tokenUsage.outputTokens
+      currentGroup.tokenUsage.cacheReadTokens += turn.tokenUsage.cacheReadTokens
+      currentGroup.tokenUsage.cacheCreation5mTokens += turn.tokenUsage.cacheCreation5mTokens
+      currentGroup.tokenUsage.cacheCreation1hTokens += turn.tokenUsage.cacheCreation1hTokens
     } else if (currentGroup) {
       // AI-only turn belonging to current group
       appendTurnToGroup(currentGroup, turn)
@@ -78,6 +85,13 @@ function appendTurnToGroup(group: ConversationGroup, turn: Turn): void {
   }
 
   collectToolCalls(group, turn)
+
+  // Aggregate token usage
+  group.tokenUsage.inputTokens += turn.tokenUsage.inputTokens
+  group.tokenUsage.outputTokens += turn.tokenUsage.outputTokens
+  group.tokenUsage.cacheReadTokens += turn.tokenUsage.cacheReadTokens
+  group.tokenUsage.cacheCreation5mTokens += turn.tokenUsage.cacheCreation5mTokens
+  group.tokenUsage.cacheCreation1hTokens += turn.tokenUsage.cacheCreation1hTokens
 
   // Update end time
   group.endTime = turn.timestamp

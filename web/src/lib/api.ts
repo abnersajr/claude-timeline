@@ -28,3 +28,21 @@ export async function fetchSession(
   if (!res.ok) throw new Error(`Failed to fetch session: ${res.status}`)
   return res.json()
 }
+
+export async function refreshSession(
+  id: string,
+): Promise<FullTimelineSession> {
+  const res = await fetch(`${API_BASE}/api/sessions/${id}/refresh`, {
+    method: "POST",
+  })
+  if (!res.ok) throw new Error(`Failed to refresh session: ${res.status}`)
+  return res.json()
+}
+
+export async function refreshSessions(): Promise<SessionSummary[]> {
+  const res = await fetch(`${API_BASE}/api/sessions/refresh`, {
+    method: "POST",
+  })
+  if (!res.ok) throw new Error(`Failed to refresh sessions: ${res.status}`)
+  return res.json()
+}

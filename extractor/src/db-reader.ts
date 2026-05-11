@@ -1,6 +1,30 @@
 import Database from "better-sqlite3"
-import { getPricing } from "./pricing.js"
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs"
+import { join } from "node:path"
+import { classifyMessage } from "./classifier.js"
+import { deduplicateByRequestId } from "./dedup.js"
+import { calculateSessionCost } from "./pricing.js"
 import type { SessionMetadata, TokenUsage, Turn } from "./types.js"
+
+/**
+ * Compute active duration by summing gaps between consecutive timestamps
+ * that are below a threshold (5 minutes). Large gaps represent idle/closed
+ * sessions and are excluded.
+ */
+function computeActiveDurationMs(
+  timestamps: string[],
+  thresholdMs = 5 * 60 * 1000,
+): number {
+  if (timestamps.length < 2) return 0
+  let activeMs = 0
+  for (let i = 1; i < timestamps.length; i++) {
+    const gap = new Date(timestamps[i]).getTime() - new Date(timestamps[i - 1]).getTime()
+    if (gap > 0 && gap < thresholdMs) {
+      activeMs += gap
+    }
+  }
+  return activeMs
+}
 
 /** Error when SQLite DB cannot be opened */
 export class DbOpenError extends Error {
@@ -221,6 +245,7 @@ export interface SessionSummary {
   turnCount: number
   lastTimestamp: string
   totalCostEstimate: number
+  activeDurationMs?: number
 }
 
 /**
@@ -237,7 +262,7 @@ export function listSessions(dbPath: string, limit = 20): SessionSummary[] {
   try {
     const rows = db
       .prepare(
-        `SELECT session_id, project_name, model, turn_count, last_timestamp,
+        `SELECT session_id, project_name, model, turn_count, first_timestamp, last_timestamp,
                 total_input_tokens, total_output_tokens, total_cache_read, total_cache_creation
          FROM sessions ORDER BY last_timestamp DESC LIMIT ?`,
       )
@@ -246,6 +271,7 @@ export function listSessions(dbPath: string, limit = 20): SessionSummary[] {
       project_name: string
       model: string | null
       turn_count: number
+      first_timestamp: string
       last_timestamp: string
       total_input_tokens: number
       total_output_tokens: number
@@ -255,12 +281,37 @@ export function listSessions(dbPath: string, limit = 20): SessionSummary[] {
 
     return rows.map((row) => {
       const model = row.model || "claude-sonnet-4-6"
-      const rate = getPricing(model)
-      const cost =
-        (row.total_input_tokens / 1_000_000) * rate.inputPerMTok +
-        (row.total_output_tokens / 1_000_000) * rate.outputPerMTok +
-        (row.total_cache_read / 1_000_000) * rate.cacheReadPerMTok +
-        (row.total_cache_creation / 1_000_000) * rate.cacheCreation5mPerMTok
+      // Build a minimal SessionMetadata + Turn[] to use the canonical cost calculator
+      const session: SessionMetadata = {
+        sessionId: row.session_id,
+        projectName: row.project_name,
+        model,
+        workingDirectory: "",
+        turnCount: row.turn_count,
+        totalTokens: {
+          inputTokens: row.total_input_tokens,
+          outputTokens: row.total_output_tokens,
+          cacheReadTokens: row.total_cache_read,
+          cacheCreation5mTokens: row.total_cache_creation,
+          cacheCreation1hTokens: 0,
+        },
+        startTime: row.first_timestamp,
+        endTime: row.last_timestamp,
+        isOngoing: false,
+      }
+      // Use one synthetic turn with totals so calculateSessionCost applies correct rates
+      const syntheticTurns: Turn[] = [
+        {
+          timestamp: row.last_timestamp,
+          tokenUsage: session.totalTokens,
+          messages: [],
+          toolCalls: [],
+          cacheWriteType: (row.total_cache_creation > 0 ? "5m" : "none") as "5m" | "none",
+          cacheReadType: "unknown" as const,
+          cacheCreationTokensThisTurn: row.total_cache_creation,
+        },
+      ]
+      const pricing = calculateSessionCost(session, syntheticTurns)
 
       return {
         sessionId: row.session_id,
@@ -268,10 +319,225 @@ export function listSessions(dbPath: string, limit = 20): SessionSummary[] {
         model,
         turnCount: row.turn_count,
         lastTimestamp: row.last_timestamp,
-        totalCostEstimate: cost,
+        totalCostEstimate: pricing.totalCost,
       }
     })
   } finally {
     db.close()
   }
+}
+
+/**
+ * Get the set of session IDs that exist in the SQLite DB.
+ */
+function getExistingSessionIds(dbPath: string): Set<string> {
+  try {
+    const db = new Database(dbPath, { readonly: true })
+    try {
+      const rows = db.prepare("SELECT session_id FROM sessions").all() as Array<{
+        session_id: string
+      }>
+      return new Set(rows.map((r) => r.session_id))
+    } finally {
+      db.close()
+    }
+  } catch {
+    return new Set()
+  }
+}
+
+/**
+ * Parse a JSONL file header to extract session summary metadata.
+ * Reads the file incrementally — stops after finding enough data.
+ */
+function parseJsonlSummary(
+  filePath: string,
+  sessionId: string,
+  projectName: string,
+): SessionSummary | null {
+  try {
+    const content = readFileSync(filePath, "utf-8")
+    const lines = content.split("\n").filter((l) => l.trim().length > 0)
+    if (lines.length === 0) return null
+
+    // Parse all records, filter noise, deduplicate — same pipeline as parseSessionJsonl
+    const allRecords: Record<string, unknown>[] = []
+    for (const line of lines) {
+      try {
+        allRecords.push(JSON.parse(line))
+      } catch {
+        continue
+      }
+    }
+
+    const nonNoise = allRecords.filter(
+      (r) => classifyMessage(r as unknown as import("./types.js").RawJsonlRecord) !== "hardNoise",
+    )
+    const records = deduplicateByRequestId(
+      nonNoise as unknown as import("./types.js").RawJsonlRecord[],
+    )
+
+    let model = "claude-sonnet-4-6"
+    let turnCount = 0
+    let lastTimestamp = ""
+    let totalInput = 0
+    let totalOutput = 0
+    let totalCacheRead = 0
+    let totalCacheCreation5m = 0
+    let totalCacheCreation1h = 0
+    const allTimestamps: string[] = []
+
+    for (const record of records) {
+      const category = classifyMessage(record)
+
+      const msg = record.message as Record<string, unknown> | undefined
+
+      // Track timestamps — only from records with actual content
+      const ts = record.timestamp
+      const hasContent = (totalInput + totalOutput + totalCacheRead + totalCacheCreation5m + totalCacheCreation1h > 0) ||
+        (msg?.usage as Record<string, unknown> | undefined != null) ||
+        (Array.isArray((msg?.content as unknown[]) ?? []) && ((msg?.content as unknown[]) ?? []).length > 0)
+      if (ts && hasContent) {
+        lastTimestamp = ts
+        allTimestamps.push(ts)
+      } else if (ts) {
+        // Still track for potential fallback, but don't use for endTime
+        allTimestamps.push(ts)
+      }
+
+      // Extract model from assistant messages
+      if (record.type === "assistant" && msg?.model) {
+        model = msg.model as string
+      }
+
+      // Count turns: assistant + real user messages (matches buildTurnsFromJsonl)
+      if (category === "assistant" || category === "user") {
+        turnCount++
+      }
+
+      // Accumulate token usage from any message with usage data
+      const usage = msg?.usage as Record<string, unknown> | undefined
+      if (usage) {
+        totalInput += (usage.input_tokens as number) ?? 0
+        totalOutput += (usage.output_tokens as number) ?? 0
+        totalCacheRead += (usage.cache_read_input_tokens as number) ?? 0
+        const cc = usage.cache_creation as Record<string, number> | undefined
+        totalCacheCreation5m +=
+          (usage.cacheCreation5mTokens as number) ?? cc?.ephemeral_5m_input_tokens ?? 0
+        totalCacheCreation1h +=
+          (usage.cacheCreation1hTokens as number) ?? cc?.ephemeral_1h_input_tokens ?? 0
+      }
+    }
+
+    // Use canonical cost calculator
+    const session: SessionMetadata = {
+      sessionId,
+      projectName,
+      model,
+      workingDirectory: "",
+      turnCount,
+      totalTokens: {
+        inputTokens: totalInput,
+        outputTokens: totalOutput,
+        cacheReadTokens: totalCacheRead,
+        cacheCreation5mTokens: totalCacheCreation5m,
+        cacheCreation1hTokens: totalCacheCreation1h,
+      },
+      startTime: "",
+      endTime: lastTimestamp || new Date().toISOString(),
+      isOngoing: false,
+    }
+    const syntheticTurns: Turn[] =
+      totalInput > 0 || totalOutput > 0
+        ? [
+            {
+              timestamp: lastTimestamp || new Date().toISOString(),
+              tokenUsage: session.totalTokens,
+              messages: [],
+              toolCalls: [],
+              cacheWriteType: (totalCacheCreation5m > 0
+                ? "5m"
+                : totalCacheCreation1h > 0
+                  ? "1h"
+                  : "none") as "5m" | "1h" | "none",
+              cacheReadType: "unknown" as const,
+              cacheCreationTokensThisTurn: totalCacheCreation5m + totalCacheCreation1h,
+            },
+          ]
+        : []
+    const pricing = calculateSessionCost(session, syntheticTurns)
+
+    return {
+      sessionId,
+      projectName,
+      model,
+      turnCount,
+      lastTimestamp: lastTimestamp || new Date().toISOString(),
+      totalCostEstimate: pricing.totalCost,
+      activeDurationMs: computeActiveDurationMs(allTimestamps),
+    }
+  } catch {
+    return null
+  }
+}
+
+/**
+ * List sessions discovered from JSONL files on disk.
+ * Skips sessions that already exist in the SQLite DB.
+ * Skips subagent files (agent-*.jsonl).
+ */
+export function listJsonlSessions(
+  projectsDir: string,
+  dbPath: string,
+  limit = 100,
+): SessionSummary[] {
+  const existingIds = getExistingSessionIds(dbPath)
+  const results: SessionSummary[] = []
+
+  if (!existsSync(projectsDir)) return results
+
+  try {
+    const projectDirs = readdirSync(projectsDir)
+
+    for (const dirName of projectDirs) {
+      const projectDir = join(projectsDir, dirName)
+      // Skip if not a directory
+      try {
+        const s = statSync(projectDir)
+        if (!s.isDirectory()) continue
+      } catch {
+        continue
+      }
+
+      // Strip leading '-' (from leading '/' in original path)
+      // Use raw directory name — decodeProjectName is lossy for paths with hyphens
+      const projectName = dirName.startsWith("-") ? dirName.slice(1) : dirName
+
+      // Find .jsonl files (skip agent-*.jsonl subagent files)
+      try {
+        const files = readdirSync(projectDir)
+        for (const file of files) {
+          if (!file.endsWith(".jsonl")) continue
+          if (file.startsWith("agent-")) continue
+
+          const sessionId = file.replace(".jsonl", "")
+
+          // Skip if already in SQLite
+          if (existingIds.has(sessionId)) continue
+
+          const filePath = join(projectDir, file)
+          const summary = parseJsonlSummary(filePath, sessionId, projectName)
+          if (summary) results.push(summary)
+        }
+      } catch {
+        // Skip unreadable directories
+      }
+    }
+  } catch {
+    // Skip if projects dir doesn't exist
+  }
+
+  // Sort by most recent first, apply limit
+  results.sort((a, b) => b.lastTimestamp.localeCompare(a.lastTimestamp))
+  return results.slice(0, limit)
 }

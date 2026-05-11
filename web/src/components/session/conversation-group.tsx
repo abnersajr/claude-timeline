@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { formatCost } from "@/lib/utils"
 import type { ConversationGroup } from "@/lib/grouping"
 import { truncateText, groupTokensSummary } from "@/lib/grouping"
 
@@ -21,7 +22,7 @@ export function ConversationGroupCard({ group }: ConversationGroupProps) {
         className="flex items-center gap-2 w-full px-3.5 py-2.5 bg-transparent border-none text-foreground cursor-pointer text-sm text-left hover:bg-muted/50"
         onClick={() => setExpanded((prev) => !prev)}
       >
-        <span className="shrink-0 w-3.5 text-[10px] text-muted-foreground">
+        <span className="shrink-0 w-3.5 text-[0.625rem] text-muted-foreground">
           {expanded ? "▼" : "▶"}
         </span>
         <span className="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-muted-foreground">
@@ -29,12 +30,12 @@ export function ConversationGroupCard({ group }: ConversationGroupProps) {
         </span>
         <span className="flex gap-1.5 shrink-0">
           {responseCount > 0 && (
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] bg-accent text-muted-foreground">
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[0.6875rem] bg-accent text-muted-foreground">
               {responseCount} response{responseCount !== 1 ? "s" : ""}
             </span>
           )}
           {hasTools && (
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] bg-orange-500/15 text-orange-500">
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[0.6875rem] bg-orange-500/15 text-orange-500">
               {group.toolExecutions.length} tool
               {group.toolExecutions.length !== 1 ? "s" : ""}
             </span>
@@ -46,15 +47,15 @@ export function ConversationGroupCard({ group }: ConversationGroupProps) {
         <span className="font-mono">{groupTokensSummary(group)}</span>
         {group.cost > 0 && (
           <span className="font-mono text-emerald-500">
-            ${group.cost.toFixed(4)}
+            {formatCost(group.cost)}
           </span>
         )}
       </div>
 
       {expanded && (
         <div className="px-3.5 pb-3.5 border-t border-border/30">
-          <div className="mt-2.5 px-3 py-2.5 rounded-md text-[13px] leading-relaxed bg-orange-500/8 border-l-[3px] border-orange-500/40">
-            <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">
+          <div className="mt-2.5 px-3 py-2.5 rounded-md text-[0.8125rem] leading-relaxed bg-orange-500/8 border-l-[3px] border-orange-500/40">
+            <div className="text-[0.6875rem] uppercase tracking-wider text-muted-foreground mb-1">
               User
             </div>
             <div className="text-muted-foreground whitespace-pre-wrap break-words">
@@ -65,9 +66,9 @@ export function ConversationGroupCard({ group }: ConversationGroupProps) {
           {group.responses.map((resp, i) => (
             <div
               key={`resp-${i}`}
-              className="mt-2.5 px-3 py-2.5 rounded-md text-[13px] leading-relaxed bg-muted/30 border-l-[3px] border-border/50"
+              className="mt-2.5 px-3 py-2.5 rounded-md text-[0.8125rem] leading-relaxed bg-muted/30 border-l-[3px] border-border/50"
             >
-              <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">
+              <div className="text-[0.6875rem] uppercase tracking-wider text-muted-foreground mb-1">
                 Assistant
               </div>
               <div className="text-muted-foreground whitespace-pre-wrap break-words">
@@ -77,11 +78,11 @@ export function ConversationGroupCard({ group }: ConversationGroupProps) {
                 <div className="mt-2 flex flex-col gap-1">
                   {resp.toolCalls.map((tc) => (
                     <div key={tc.id} className="flex items-center gap-2 text-xs">
-                      <span className="px-1.5 py-0.5 rounded bg-orange-500/12 text-orange-500 font-mono text-[11px]">
+                      <span className="px-1.5 py-0.5 rounded bg-orange-500/12 text-orange-500 font-mono text-[0.6875rem]">
                         {tc.name}
                       </span>
                       {tc.arguments && (
-                        <code className="text-[11px] text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded">
+                        <code className="text-[0.6875rem] text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded">
                           {truncateText(tc.arguments, 80)}
                         </code>
                       )}
@@ -106,7 +107,7 @@ export function ConversationGroupCard({ group }: ConversationGroupProps) {
                     {tool.name}
                   </span>
                   {tool.result && (
-                    <pre className="mt-1.5 text-[11px] text-muted-foreground bg-black/20 p-2 rounded overflow-x-auto max-h-[120px]">
+                    <pre className="mt-1.5 text-[0.6875rem] text-muted-foreground bg-black/20 p-2 rounded overflow-x-auto max-h-[120px]">
                       {truncateText(tool.result, 200)}
                     </pre>
                   )}
@@ -115,7 +116,7 @@ export function ConversationGroupCard({ group }: ConversationGroupProps) {
             </div>
           )}
 
-          <div className="flex gap-4 mt-3 pt-2 border-t border-border/30 text-[11px] font-mono text-muted-foreground">
+          <div className="flex gap-4 mt-3 pt-2 border-t border-border/30 text-[0.6875rem] font-mono text-muted-foreground">
             <span>Prompt: {group.tokens.prompt.toLocaleString()}</span>
             <span>Completion: {group.tokens.completion.toLocaleString()}</span>
             <span>Total: {group.tokens.total.toLocaleString()}</span>

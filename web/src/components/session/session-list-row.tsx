@@ -1,4 +1,5 @@
 import type { SessionSummary } from "@/lib/api"
+import { formatCost } from "@/lib/utils"
 import { Link } from "@tanstack/react-router"
 
 interface SessionListRowProps {
@@ -15,9 +16,7 @@ function formatTime(iso: string): string {
   })
 }
 
-function formatCost(cost: number): string {
-  return `$${cost.toFixed(4)}`
-}
+
 
 export function SessionListRow({ session }: SessionListRowProps) {
   return (

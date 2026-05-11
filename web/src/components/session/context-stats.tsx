@@ -100,7 +100,7 @@ function InjectionTimeline({ stats }: { stats: ContextStatsType }) {
           )
         })}
       </div>
-      <div className="mt-1 flex justify-between text-[10px] text-muted-foreground">
+      <div className="mt-1 flex justify-between text-[0.625rem] text-muted-foreground">
         <span>Start</span>
         <span>{totalInjections} injections across {stats.phaseCount} phase{stats.phaseCount !== 1 ? "s" : ""}</span>
         <span>End</span>

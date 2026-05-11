@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router"
 import { useQuery } from "@tanstack/react-query"
 import { fetchSession } from "@/lib/api"
 import { OverviewCard } from "@/components/session/overview-card"
-import { Timeline } from "@/components/session/timeline"
+import { ChatTimeline } from "@/components/session/chat-timeline"
 import { TokenChart } from "@/components/session/token-chart"
 import { CostBreakdown } from "@/components/session/cost-breakdown"
 import { ContextStats } from "@/components/session/context-stats"
@@ -19,6 +19,13 @@ function SessionDetailContent() {
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["session", sessionId],
     queryFn: () => fetchSession(sessionId),
+    // Auto-poll ongoing sessions every 5s
+    refetchInterval: (query) => {
+      const session = query.state.data?.session
+      if (session?.isOngoing) return 5000
+      return false
+    },
+    refetchIntervalInBackground: true,
   })
 
   if (isLoading) {
@@ -57,11 +64,12 @@ function SessionDetailContent() {
 
       {/* Token chart + Cost breakdown side by side on wide screens */}
       <div className="grid gap-6 lg:grid-cols-2">
-        <TokenChart turns={data.turns} />
+        <TokenChart turns={data.turns} turnsPricing={data.pricing.turnsPricing} />
         <CostBreakdown pricing={data.pricing} turns={data.turns} />
       </div>
 
-      <Timeline
+      <ChatTimeline
+        conversationGroups={data.conversationGroups ?? []}
         turns={data.turns}
         turnsPricing={data.pricing.turnsPricing}
         subagents={data.subagents}

@@ -25,6 +25,21 @@ function hasTextOrImageContent(
   return content.some((block) => block.type === "text" || block.type === "image")
 }
 
+/**
+ * Check if an array content is tool_result-only (no text/image blocks).
+ * These are tool execution results coming back from the CLI — they represent
+ * assistant context, not actual user-typed input.
+ */
+function isToolResultOnly(
+  content: Array<Record<string, unknown>> | string,
+): boolean {
+  if (typeof content === "string") return false
+  return (
+    content.length > 0 &&
+    content.every((block) => block.type === "tool_result")
+  )
+}
+
 // ─── Type guard functions ───────────────────────────────────────────
 
 /**
@@ -78,6 +93,8 @@ export function isSystemMessage(record: RawJsonlRecord): boolean {
  * User messages: type=user, isMeta=false, has text/image content
  * (not just tool_result blocks). Meta messages (tool results) are
  * classified as assistant because they represent assistant context.
+ * Tool-result-only records (isMeta=null, content is array of tool_result)
+ * are also classified as assistant — they're CLI tool outputs, not user input.
  */
 export function isUserMessage(record: RawJsonlRecord): boolean {
   if (record.type !== "user") return false
@@ -88,6 +105,9 @@ export function isUserMessage(record: RawJsonlRecord): boolean {
 
   // String content is always user text
   if (typeof content === "string") return true
+
+  // Array content: tool_result-only = NOT a user message (it's CLI tool output)
+  if (isToolResultOnly(content)) return false
 
   // Array content: must have at least one text or image block
   return hasTextOrImageContent(content)
