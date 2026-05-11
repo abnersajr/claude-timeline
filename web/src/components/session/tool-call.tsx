@@ -4,6 +4,7 @@ import { useState } from "react"
 import { Collapsible } from "@base-ui/react/collapsible"
 import type { ToolCall } from "@timeline/types"
 import { cn } from "@/lib/utils"
+import { CollapsibleResult } from "./collapsible-result"
 
 interface ToolCallItemProps {
   toolCall: ToolCall
@@ -35,11 +36,6 @@ function truncateInput(input: Record<string, unknown>, maxLen = 80): string {
   return `{${keys.join(", ")}${suffix}}`
 }
 
-function truncateResult(result: string, maxLen = 200): string {
-  if (result.length <= maxLen) return result
-  return `${result.slice(0, maxLen)}…`
-}
-
 /** Status indicator dot for tool call result */
 function StatusDot({ isError }: { isError?: boolean }) {
   return (
@@ -51,6 +47,7 @@ function StatusDot({ isError }: { isError?: boolean }) {
     />
   )
 }
+
 
 export function ToolCallItem({ toolCall, className }: ToolCallItemProps) {
   const [open, setOpen] = useState(false)
@@ -127,21 +124,13 @@ export function ToolCallItem({ toolCall, className }: ToolCallItemProps) {
             </pre>
           </div>
 
-          {/* Result */}
+          {/* Result — collapsible */}
           {hasResult && (
-            <div>
-              <span className="mb-1 flex items-center gap-1.5 text-sm font-medium uppercase tracking-wider text-muted-foreground">
-                Result
-                {toolCall.isError && (
-                  <span className="rounded bg-red-500/15 px-1 py-0.5 text-red-500">
-                    error
-                  </span>
-                )}
-              </span>
-              <pre className="max-h-48 overflow-auto rounded-md bg-accent p-2.5 font-mono text-xs text-muted-foreground whitespace-pre-wrap break-all">
-                {truncateResult(toolCall.result!)}
-              </pre>
-            </div>
+            <CollapsibleResult
+              label="Result"
+              content={toolCall.result!}
+              isError={toolCall.isError}
+            />
           )}
 
           {/* Task metadata */}

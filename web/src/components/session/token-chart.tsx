@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect, useCallback } from "react"
-import type { Turn, TokenUsage } from "@timeline/types"
-import { cn, formatTokens } from "@/lib/utils"
+import type { Turn, TokenUsage, TurnPricing } from "@timeline/types"
+import { cn, formatTokens, formatCost } from "@/lib/utils"
+import { buildSessionSteps } from "@/lib/steps"
+import type { StepAggregate } from "@/lib/steps"
 
 // ---------------------------------------------------------------------------
 // Types
@@ -8,6 +10,7 @@ import { cn, formatTokens } from "@/lib/utils"
 
 interface TokenChartProps {
   turns: Turn[]
+  turnsPricing: TurnPricing[]
   className?: string
 }
 
@@ -17,13 +20,13 @@ type TokenKey =
   | "cacheReadTokens"
   | "cacheCreation5mTokens"
   | "cacheCreation1hTokens"
-  | "cacheCreationTokens"
 
 interface TokenSegment {
   key: TokenKey
   label: string
   color: string
 }
+
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -47,18 +50,12 @@ const LABEL_HEIGHT = 20
 // Helpers
 // ---------------------------------------------------------------------------
 
-function segmentTotal(usage: TokenUsage, key: TokenKey): number {
+function segmentTotal(usage: { inputTokens: number; outputTokens: number; cacheReadTokens: number; cacheCreation5mTokens: number; cacheCreation1hTokens: number }, key: TokenKey): number {
   return usage[key] ?? 0
 }
 
-function turnTotal(turn: Turn): number {
-  return (
-    turn.tokenUsage.inputTokens +
-    turn.tokenUsage.outputTokens +
-    turn.tokenUsage.cacheReadTokens +
-    (turn.tokenUsage.cacheCreation5mTokens ?? 0) +
-    (turn.tokenUsage.cacheCreation1hTokens ?? 0)
-  )
+function buildStepAggregates(turns: Turn[], turnsPricing: TurnPricing[]): StepAggregate[] {
+  return buildSessionSteps(turns, turnsPricing).stepAggregates
 }
 
 // ---------------------------------------------------------------------------
@@ -78,22 +75,21 @@ function Legend() {
   )
 }
 
-function TurnBar({
-  turn,
-  index,
+function StepBar({
+  step,
   maxTokens,
+  cumulativeCost,
 }: {
-  turn: Turn
-  index: number
+  step: StepAggregate
   maxTokens: number
+  cumulativeCost: number
 }) {
   const [hovered, setHovered] = useState(false)
   const barRef = useRef<HTMLDivElement>(null)
-  const total = turnTotal(turn)
 
   if (maxTokens === 0) return null
 
-  const barHeight = Math.max((total / maxTokens) * MAX_BAR_HEIGHT, MIN_BAR_HEIGHT)
+  const barHeight = Math.max((step.totalTokens / maxTokens) * MAX_BAR_HEIGHT, MIN_BAR_HEIGHT)
 
   // Calculate fixed position for tooltip when hovered
   const getTooltipStyle = (): React.CSSProperties => {
@@ -105,7 +101,7 @@ function TurnBar({
       top: `${rect.top - 8}px`,
       transform: "translate(-50%, -100%)",
       zIndex: 9999,
-      minWidth: "180px",
+      minWidth: "220px",
     }
   }
 
@@ -123,9 +119,9 @@ function TurnBar({
         onMouseLeave={() => setHovered(false)}
       >
         {SEGMENTS.map((seg) => {
-          const val = segmentTotal(turn.tokenUsage, seg.key)
+          const val = segmentTotal(step, seg.key)
           if (val === 0) return null
-          const segHeight = total > 0 ? (val / total) * barHeight : 0
+          const segHeight = step.totalTokens > 0 ? (val / step.totalTokens) * barHeight : 0
           return (
             <div
               key={seg.key}
@@ -146,11 +142,11 @@ function TurnBar({
           className="pointer-events-none rounded-lg border border-border bg-card p-3 shadow-lg"
         >
           <p className="mb-1.5 text-xs font-semibold text-foreground">
-            Turn {index + 1}
+            Step {step.stepIndex + 1}
           </p>
           <div className="space-y-0.5">
             {SEGMENTS.map((seg) => {
-              const val = segmentTotal(turn.tokenUsage, seg.key)
+              const val = segmentTotal(step, seg.key)
               if (val === 0) return null
               return (
                 <div key={seg.key} className="flex items-center justify-between gap-4 text-xs">
@@ -167,21 +163,35 @@ function TurnBar({
             <div className="mt-1 border-t border-border pt-1 flex justify-between text-xs">
               <span className="text-muted-foreground">Total</span>
               <span className="font-semibold text-foreground">
-                {formatTokens(total)}
+                {formatTokens(step.totalTokens)}
+              </span>
+            </div>
+            {/* Step cost */}
+            <div className="flex justify-between text-xs">
+              <span className="text-muted-foreground">Step cost</span>
+              <span className="font-semibold text-emerald-500">
+                {formatCost(step.totalCost)}
+              </span>
+            </div>
+            {/* Cumulative cost */}
+            <div className="flex justify-between text-xs">
+              <span className="text-muted-foreground">Cumulative</span>
+              <span className="font-semibold text-emerald-500">
+                +{formatCost(step.cumulativeCost)}
               </span>
             </div>
           </div>
         </div>
       )}
 
-      {/* Label — every 5th turn, below the bar */}
+      {/* Label — every 5th step, below the bar */}
       <span
         className={cn(
-          "text-[10px] mt-1 whitespace-nowrap",
-          (index + 1) % 5 === 0 ? "text-muted-foreground" : "text-transparent",
+          "text-[0.625rem] mt-1 whitespace-nowrap text-center w-full",
+          (step.stepIndex + 1) % 5 === 0 ? "text-muted-foreground" : "text-transparent",
         )}
       >
-        {index + 1}
+        {step.stepIndex + 1}
       </span>
     </div>
   )
@@ -191,7 +201,7 @@ function TurnBar({
 // Main component
 // ---------------------------------------------------------------------------
 
-export function TokenChart({ turns, className }: TokenChartProps) {
+export function TokenChart({ turns, turnsPricing, className }: TokenChartProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const [overflowing, setOverflowing] = useState(false)
 
@@ -211,28 +221,32 @@ export function TokenChart({ turns, className }: TokenChartProps) {
     return () => ro.disconnect()
   }, [checkOverflow, turns])
 
-  if (turns.length === 0) {
+  // Build step aggregates
+  const stepAggregates = buildStepAggregates(turns, turnsPricing)
+  const nonZeroSteps = stepAggregates.filter((s) => s.totalTokens > 0)
+
+  if (nonZeroSteps.length === 0) {
     return (
       <div className={cn("rounded-xl border border-border bg-background p-6 overflow-visible", className)}>
         <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
           Token Usage
         </h3>
-        <p className="mt-4 text-sm text-muted-foreground">No turns to display.</p>
+        <p className="mt-4 text-sm text-muted-foreground">No steps to display.</p>
       </div>
     )
   }
 
   // Compute max total for scaling
-  const maxTokens = turns.reduce((max, turn) => {
-    return Math.max(max, turnTotal(turn))
+  const maxTokens = nonZeroSteps.reduce((max, step) => {
+    return Math.max(max, step.totalTokens)
   }, 0)
 
   // Limit display to 50 bars max for readability; sample evenly
   const maxBars = 50
-  const displayTurns =
-    turns.length <= maxBars
-      ? turns
-      : turns.filter((_, i) => i % Math.ceil(turns.length / maxBars) === 0 || i === turns.length - 1)
+  const displaySteps =
+    nonZeroSteps.length <= maxBars
+      ? nonZeroSteps
+      : nonZeroSteps.filter((_, i) => i % Math.ceil(nonZeroSteps.length / maxBars) === 0 || i === nonZeroSteps.length - 1)
 
   return (
     <div className={cn("rounded-xl border border-border bg-background p-6 overflow-visible", className)}>
@@ -243,7 +257,7 @@ export function TokenChart({ turns, className }: TokenChartProps) {
             Token Usage
           </h3>
           <span className="text-xs text-muted-foreground">
-            {turns.length} turn{turns.length !== 1 ? "s" : ""}
+            {nonZeroSteps.length} step{nonZeroSteps.length !== 1 ? "s" : ""}
           </span>
         </div>
         <div className="mt-2">
@@ -271,20 +285,14 @@ export function TokenChart({ turns, className }: TokenChartProps) {
             className="flex items-end"
             style={{ gap: `${BAR_GAP}px`, minHeight: `${MAX_BAR_HEIGHT + LABEL_HEIGHT + 8}px` }}
           >
-            {displayTurns.map((turn, i) => {
-              const originalIndex =
-                turns.length <= maxBars
-                  ? i
-                  : turns.indexOf(turn)
-              return (
-                <TurnBar
-                  key={turn.timestamp}
-                  turn={turn}
-                  index={originalIndex}
-                  maxTokens={maxTokens}
-                />
-              )
-            })}
+            {displaySteps.map((step) => (
+              <StepBar
+                key={step.stepIndex}
+                step={step}
+                maxTokens={maxTokens}
+                cumulativeCost={step.cumulativeCost}
+              />
+            ))}
           </div>
         </div>
       </div>
@@ -292,13 +300,13 @@ export function TokenChart({ turns, className }: TokenChartProps) {
       {/* Summary row */}
       <div className="mt-4 grid grid-cols-5 gap-2 rounded-lg border border-border/50 p-3">
         {SEGMENTS.map((seg) => {
-          const total = turns.reduce(
-            (sum, t) => sum + segmentTotal(t.tokenUsage, seg.key),
+          const total = nonZeroSteps.reduce(
+            (sum, step) => sum + segmentTotal(step, seg.key),
             0,
           )
           return (
             <div key={seg.key} className="text-center">
-              <p className="text-[10px] text-muted-foreground">{seg.label}</p>
+              <p className="text-[0.625rem] text-muted-foreground">{seg.label}</p>
               <p className="text-xs font-semibold text-foreground">
                 {formatTokens(total)}
               </p>

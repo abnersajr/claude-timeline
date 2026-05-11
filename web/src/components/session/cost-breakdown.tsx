@@ -1,9 +1,11 @@
+import { useCallback } from "react"
 import type {
   Turn,
   TurnPricing,
   SessionPricing,
 } from "@timeline/types"
 import { cn, formatCost } from "@/lib/utils"
+import { buildSessionSteps } from "@/lib/steps"
 
 // ---------------------------------------------------------------------------
 // Types
@@ -53,6 +55,8 @@ function aggregateCosts(turnsPricing: TurnPricing[]): Record<string, number> {
   return agg
 }
 
+
+
 // ---------------------------------------------------------------------------
 // Sub-components
 // ---------------------------------------------------------------------------
@@ -91,52 +95,89 @@ function PricingRateRow({ label, rate }: PricingRateRowProps) {
   )
 }
 
-function PerTurnTable({
+function PerStepTable({
   turns,
   turnsPricing,
 }: {
   turns: Turn[]
   turnsPricing: TurnPricing[]
 }) {
-  if (turns.length === 0) return null
+  const { steps, nonZeroCostSteps } = buildSessionSteps(turns, turnsPricing)
+
+  const handleClick = useCallback((stepIndex: number) => {
+    const el = document.getElementById(`step-S${stepIndex + 1}`)
+    if (!el) return
+    el.scrollIntoView({ behavior: "smooth", block: "center" })
+    // Flash highlight
+    el.classList.add("step-flash")
+    setTimeout(() => el.classList.remove("step-flash"), 2000)
+  }, [])
+
+  if (nonZeroCostSteps.length === 0) return null
+
+  // Running cumulative total
+  let cumulative = 0
 
   return (
     <div>
       <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-text-muted">
-        Per-Turn Cost
+        Per-Step Cost
       </h4>
-      <div className="max-h-48 overflow-y-auto rounded-lg border border-border">
+      <div className="max-h-64 overflow-y-auto rounded-lg border border-border">
         <table className="w-full text-xs">
           <thead>
             <tr className="border-b border-border bg-surface-2">
-              <th className="px-2 py-1.5 text-left font-medium text-text-muted">#</th>
+              <th className="px-2 py-1.5 text-left font-medium text-text-muted">Step</th>
               <th className="px-2 py-1.5 text-right font-medium text-text-muted">Input</th>
               <th className="px-2 py-1.5 text-right font-medium text-text-muted">Output</th>
-              <th className="px-2 py-1.5 text-right font-medium text-text-muted">Cache</th>
+              <th className="px-2 py-1.5 text-right font-medium text-text-muted">CR</th>
+              <th className="px-2 py-1.5 text-right font-medium text-text-muted">CW5m</th>
+              <th className="px-2 py-1.5 text-right font-medium text-text-muted">CW1h</th>
               <th className="px-2 py-1.5 text-right font-medium text-text-muted">Total</th>
+              <th className="px-2 py-1.5 text-right font-medium text-text-muted">Cumul.</th>
             </tr>
           </thead>
           <tbody>
-            {turnsPricing.map((tp, i) => (
-              <tr
-                key={turns[i]?.timestamp ?? i}
-                className="border-b border-border/50 last:border-0 hover:bg-surface-2/50 transition-colors"
-              >
-                <td className="px-2 py-1.5 text-text-muted">{i + 1}</td>
-                <td className="px-2 py-1.5 text-right text-text-secondary">
-                  {formatCost(tp.inputCost)}
-                </td>
-                <td className="px-2 py-1.5 text-right text-text-secondary">
-                  {formatCost(tp.outputCost)}
-                </td>
-                <td className="px-2 py-1.5 text-right text-text-secondary">
-                  {formatCost(tp.cacheReadCost + tp.cacheCreation5mCost + tp.cacheCreation1hCost)}
-                </td>
-                <td className="px-2 py-1.5 text-right font-medium text-text-primary">
-                  {formatCost(tp.totalCost)}
-                </td>
-              </tr>
-            ))}
+            {nonZeroCostSteps.map((step, _filteredIdx) => {
+              // Find the original step index in the full steps array for the ID
+              const originalIdx = steps.indexOf(step)
+              cumulative += step.totalCost
+
+              return (
+                <tr
+                  key={step.anchor.timestamp}
+                  onClick={() => handleClick(originalIdx)}
+                  className="border-b border-border/50 last:border-0 hover:bg-surface-2/50 transition-colors cursor-pointer"
+                >
+                  <td className="px-2 py-1.5">
+                    <span className="shrink-0 rounded bg-primary/10 px-1.5 py-0.5 text-xs font-bold text-primary">
+                      S{originalIdx + 1}
+                    </span>
+                  </td>
+                  <td className="px-2 py-1.5 text-right text-text-secondary">
+                    {formatCost(step.inputCost)}
+                  </td>
+                  <td className="px-2 py-1.5 text-right text-text-secondary">
+                    {formatCost(step.outputCost)}
+                  </td>
+                  <td className="px-2 py-1.5 text-right text-text-secondary">
+                    {formatCost(step.cacheReadCost)}
+                  </td>
+                  <td className="px-2 py-1.5 text-right text-text-secondary">
+                    {formatCost(step.cacheCreation5mCost)}
+                  </td>
+                  <td className="px-2 py-1.5 text-right text-text-secondary">
+                    {formatCost(step.cacheCreation1hCost)}
+                  </td>
+                  <td className="px-2 py-1.5 text-right font-semibold text-emerald-500">
+                    {formatCost(step.totalCost)}
+                  </td>
+                  <td className="px-2 py-1.5 text-right font-semibold text-emerald-500">
+                    +{formatCost(cumulative)}
+                  </td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>
@@ -193,9 +234,9 @@ export function CostBreakdown({ pricing, turns, className }: CostBreakdownProps)
         </div>
       </div>
 
-      {/* Per-turn table */}
+      {/* Per-step table */}
       <div className="mt-4">
-        <PerTurnTable turns={turns} turnsPricing={turnsPricing} />
+        <PerStepTable turns={turns} turnsPricing={turnsPricing} />
       </div>
     </div>
   )

@@ -17,8 +17,15 @@ import {
   formatTokens,
 } from "@/lib/utils"
 import { ToolCallList, ToolCallPills } from "./tool-call"
+import { CollapsibleResult } from "./collapsible-result"
 import { SubagentCard } from "./subagent-card"
 import { Timeline } from "./timeline"
+import {
+  type Step,
+  buildSessionSteps,
+  computeGroupStepOffsets,
+  getStepToolName,
+} from "@/lib/steps"
 
 // ---------------------------------------------------------------------------
 // Props
@@ -154,6 +161,7 @@ function extractToolResultsFromMessages(turn: Turn): Array<{ content: string; is
   return result
 }
 
+
 /** Turn row — compact inline display for a single turn */
 function TurnRow({ turn, index, pricing, isFinalOutput }: { turn: Turn; index: number; pricing?: TurnPricing; isFinalOutput?: boolean }) {
   const [showDetails, setShowDetails] = useState(false)
@@ -254,19 +262,126 @@ function TurnRow({ turn, index, pricing, isFinalOutput }: { turn: Turn; index: n
             </div>
           )}
 
-          {/* Message tool_result blocks */}
+          {/* Message tool_result blocks — collapsible */}
           {messageToolResults.length > 0 && (
             <div className="rounded-md border border-blue-500/20 bg-blue-500/5 p-2">
               {messageToolResults.map((tr, i) => (
-                <div key={i}>
-                  {tr.isError && <span className="text-xs text-red-400 mr-2">error</span>}
-                  <pre className="text-xs text-muted-foreground whitespace-pre-wrap break-all max-h-24 overflow-auto">
-                    {tr.content.length > 200 ? tr.content.slice(0, 200) + "…" : tr.content}
-                  </pre>
-                </div>
+                <CollapsibleResult
+                  key={i}
+                  label={`Result (${messageToolResults.length})`}
+                  content={tr.content}
+                  isError={tr.isError}
+                  labelClassName="text-blue-400 hover:text-blue-300"
+                />
               ))}
             </div>
           )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** Step row — renders one billing step (anchor + tool turns) as a collapsed row */
+function StepRow({
+  step,
+  index,
+  globalOffset,
+}: {
+  step: Step
+  index: number
+  globalOffset: number
+}) {
+  const [expanded, setExpanded] = useState(false)
+  const anchorName = getStepToolName(step.anchor)
+  const anchorHasContent = getAssistantText(step.anchor) !== null
+
+  // Summary text
+  let summary: string
+  if (step.tools.length === 0) {
+    if (anchorName) {
+      summary = anchorHasContent ? `${anchorName} → result` : anchorName
+    } else {
+      summary = "processing…"
+    }
+  } else if (!anchorName) {
+    // PROCESSING anchor (no tool)
+    const unique = [...new Set(step.toolNames)]
+    summary = step.tools.length === 1
+      ? `processing… → ${step.toolNames[0]}`
+      : `processing… → [${unique.join(", ")}] ×${step.tools.length}`
+  } else {
+    // TOOL_CALL anchor
+    const unique = [...new Set(step.toolNames)]
+    summary = `${anchorName} → [${unique.join(", ")}]`
+  }
+
+  const uniqueToolNames = [...new Set(step.toolNames)]
+  const ctx = totalContext(step.anchor)
+
+  return (
+    <div id={`step-S${index + 1}`} className="py-1.5 px-2 rounded hover:bg-muted/20 transition-colors">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+        {/* Step badge */}
+        <span className="shrink-0 rounded bg-primary/10 px-1.5 py-0.5 text-xs font-bold text-primary">
+          S{index + 1}
+        </span>
+
+        {/* Expand toggle */}
+        <button
+          type="button"
+          onClick={() => setExpanded(!expanded)}
+          className="cursor-pointer shrink-0 flex items-center gap-1.5"
+        >
+          <svg
+            className={cn("h-3 w-3 shrink-0 transition-transform text-muted-foreground", expanded && "rotate-90")}
+            fill="none"
+            viewBox="0 0 24 24"
+            strokeWidth={2}
+            stroke="currentColor"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+          </svg>
+          <span className="text-foreground/80">{summary}</span>
+        </button>
+
+        {/* Tool pills (only when multiple unique tools) */}
+        {uniqueToolNames.length > 1 && (
+          <div className="flex items-center gap-1 shrink-0">
+            {uniqueToolNames.map((name) => (
+              <span
+                key={name}
+                className="rounded-md border border-orange-500/20 bg-orange-500/10 px-1.5 py-0.5 text-xs font-medium text-orange-400"
+              >
+                {name}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* Metrics */}
+        <span className="shrink-0 font-mono text-xs text-muted-foreground ml-auto">{formatTokens(ctx)} ctx</span>
+        <span className="shrink-0 font-mono text-xs text-muted-foreground">{formatTokens(step.totalOutput)} out</span>
+        {step.totalCost > 0 && (
+          <span className="shrink-0 font-mono text-xs text-emerald-500">{formatCost(step.totalCost)}</span>
+        )}
+        {step.tools.length > 0 && (
+          <span className="shrink-0 text-xs text-muted-foreground">
+            ×{step.tools.length} tool{step.tools.length !== 1 ? "s" : ""}
+          </span>
+        )}
+      </div>
+
+      {/* Expanded: raw turn rows */}
+      {expanded && (
+        <div className="mt-1.5 ml-5 pl-3 border-l-2 border-border/30 space-y-0.5">
+          {[step.anchor, ...step.tools].map((turn, i) => (
+            <TurnRow
+              key={turn.timestamp}
+              turn={turn}
+              index={globalOffset + i}
+            />
+          ))}
         </div>
       )}
     </div>
@@ -280,7 +395,7 @@ function AgentOutputBubble({ text, turn }: { text: string; turn: Turn }) {
       <div className="relative">
         <div className="absolute -top-1.5 right-3 h-3 w-3 rotate-45 border-r border-t border-emerald-500/30 bg-emerald-500/5" />
         <div className="relative max-w-full rounded-2xl rounded-tr-md border border-emerald-500/20 bg-emerald-500/5 px-4 py-2.5 max-sm:max-w-full">
-          <div className="prose prose-sm prose-invert max-w-none font-mono text-[15px] text-foreground/90 break-words [&_strong]:text-foreground [&_code]:text-emerald-400 [&_code]:bg-emerald-500/10 [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded [&_pre]:bg-muted/50 [&_pre]:p-2 [&_pre]:rounded-md [&_pre]:overflow-x-auto [&_ul]:my-1 [&_li]:my-0.5">
+          <div className="prose prose-sm prose-invert max-w-none font-mono text-[0.9375rem] text-foreground/90 break-words [&_strong]:text-foreground [&_code]:text-emerald-400 [&_code]:bg-emerald-500/10 [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded [&_pre]:bg-muted/50 [&_pre]:p-2 [&_pre]:rounded-md [&_pre]:overflow-x-auto [&_ul]:my-1 [&_li]:my-0.5">
             <Markdown>{text}</Markdown>
           </div>
         </div>
@@ -289,63 +404,38 @@ function AgentOutputBubble({ text, turn }: { text: string; turn: Turn }) {
   )
 }
 
-/** Processing turns (T1–T{n-1}) — wrapped in a single collapsible */
+/** Processing turns (T1–T{n-1}) — grouped into billing-based steps */
 function ProcessingTurns({
   turns,
   turnsPricing,
   firstGlobalIdx,
+  stepOffset,
 }: {
   turns: Turn[]
   turnsPricing: TurnPricing[]
   firstGlobalIdx: number
+  stepOffset: number
 }) {
-  const [expanded, setExpanded] = useState(false)
+  const { steps } = buildSessionSteps(turns, turnsPricing)
 
-  // Count total tool calls across all processing turns
-  let totalTools = 0
-  for (const t of turns) totalTools += t.toolCalls.length
+  // Running offset for global turn index inside each step
+  let offset = 0
 
   return (
-    <div className="rounded-md border border-border/40 bg-muted/10">
-      {/* Collapsible header */}
-      <button
-        type="button"
-        onClick={() => setExpanded(!expanded)}
-        className="flex w-full items-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-      >
-        <svg
-          className={cn("h-3.5 w-3.5 shrink-0 transition-transform", expanded && "rotate-90")}
-          fill="none"
-          viewBox="0 0 24 24"
-          strokeWidth={2}
-          stroke="currentColor"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-        </svg>
-        <span className="font-semibold text-foreground">
-          T{firstGlobalIdx + 1}–{firstGlobalIdx + turns.length}
-        </span>
-        <span>· {turns.length} turn{turns.length !== 1 ? "s" : ""}</span>
-        {totalTools > 0 && (
-          <span>· {totalTools} tool call{totalTools !== 1 ? "s" : ""}</span>
-        )}
-        <span className="ml-auto text-xs">{expanded ? "collapse" : "expand"}</span>
-      </button>
-
-      {/* Expanded turn rows */}
-      {expanded && (
-        <div className="space-y-1 border-t border-border/30 px-3 pt-2 pb-2">
-          {turns.map((turn, i) => (
-            <div key={turn.timestamp}>
-              <TurnRow
-                turn={turn}
-                index={firstGlobalIdx + i}
-                pricing={turnsPricing[firstGlobalIdx + i]}
-              />
-            </div>
-          ))}
-        </div>
-      )}
+    <div className="space-y-0.5">
+      {steps.map((step, i) => {
+        const globalOffset = firstGlobalIdx + offset
+        const stepSize = 1 + step.tools.length
+        offset += stepSize
+        return (
+          <StepRow
+            key={step.anchor.timestamp}
+            step={step}
+            index={stepOffset + i}
+            globalOffset={globalOffset}
+          />
+        )
+      })}
     </div>
   )
 }
@@ -354,9 +444,13 @@ function ProcessingTurns({
 function InteractionGroup({
   turns,
   turnsPricing,
+  startIndex,
+  stepOffset,
 }: {
   turns: Turn[]
   turnsPricing: TurnPricing[]
+  startIndex: number
+  stepOffset: number
 }) {
   // Extract user message from the first turn
   const firstTurn = turns[0]
@@ -372,7 +466,7 @@ function InteractionGroup({
   }
 
   // Compute global indices
-  const firstGlobalIdx = 0 // will be set by caller
+  const firstGlobalIdx = startIndex
 
   return (
     <div className="rounded-lg border border-border/60 bg-card shadow-sm">
@@ -393,7 +487,7 @@ function InteractionGroup({
               <span>{formatTimestamp(firstTurn.timestamp)}</span>
             </div>
             <div className={cn(
-              "max-w-[70%] rounded-2xl rounded-tl-md border px-4 py-2.5 font-mono text-[15px] max-sm:max-w-full",
+              "max-w-[70%] rounded-2xl rounded-tl-md border px-4 py-2.5 font-mono text-[0.9375rem] max-sm:max-w-full",
               userText.startsWith("/") ? "border-primary/30 bg-primary/15 text-primary-foreground" : "border-primary/20 bg-primary/10 text-foreground",
             )}>
               <p className="whitespace-pre-wrap break-words">{userText}</p>
@@ -415,29 +509,16 @@ function InteractionGroup({
               </svg>
             </div>
 
-            {/* Processing turns (T1–T{n-1}) — collapsed by default */}
-            {lastTextIdx > 0 && (
-              <ProcessingTurns
-                turns={turns.slice(0, lastTextIdx)}
-                turnsPricing={turnsPricing}
-                firstGlobalIdx={firstGlobalIdx}
-              />
-            )}
+            {/* All turns grouped into billing-based steps (including final output) */}
+            <ProcessingTurns
+              turns={turns}
+              turnsPricing={turnsPricing}
+              firstGlobalIdx={firstGlobalIdx}
+              stepOffset={stepOffset}
+            />
 
-            {/* Final turn (T{n}) — visible by default */}
-            {lastTextIdx >= 0 && (
-              <div className={lastTextIdx > 0 ? "mt-2" : ""}>
-                <TurnRow
-                  turn={turns[lastTextIdx]}
-                  index={firstGlobalIdx + lastTextIdx}
-                  pricing={turnsPricing[firstGlobalIdx + lastTextIdx]}
-                  isFinalOutput={true}
-                />
-              </div>
-            )}
-
-            {/* Agent output bubble */}
-            {lastTextIdx >= 0 && (
+            {/* Agent output bubble (rendered after the last step) */}
+            {lastTextIdx >= 0 && getAssistantText(turns[lastTextIdx]) && (
               <div className="mt-3">
                 <AgentOutputBubble text={getAssistantText(turns[lastTextIdx])!} turn={turns[lastTextIdx]} />
               </div>
@@ -484,13 +565,17 @@ export function ChatTimeline({
   }
   if (current.length > 0) groups.push({ turns: current, startIndex: currentStart })
 
+  const groupStepOffsets = computeGroupStepOffsets(groups, turnsPricing)
+
   return (
     <div className={cn("space-y-6", className)}>
-      {groups.map((group) => (
+      {groups.map((group, groupIdx) => (
         <InteractionGroup
           key={group.turns[0].timestamp}
           turns={group.turns}
-          turnsPricing={turnsPricing}
+          turnsPricing={turnsPricing.slice(group.startIndex, group.startIndex + group.turns.length)}
+          startIndex={group.startIndex}
+          stepOffset={groupStepOffsets[groupIdx]}
         />
       ))}
     </div>
