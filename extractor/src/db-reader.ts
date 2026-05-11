@@ -396,6 +396,7 @@ function parseJsonlSummary(
       const ts = record.timestamp
       const hasContent = (totalInput + totalOutput + totalCacheRead + totalCacheCreation5m + totalCacheCreation1h > 0) ||
         (msg?.usage as Record<string, unknown> | undefined != null) ||
+        (typeof msg?.content === "string" && (msg.content as string).length > 0) ||
         (Array.isArray((msg?.content as unknown[]) ?? []) && ((msg?.content as unknown[]) ?? []).length > 0)
       if (ts && hasContent) {
         lastTimestamp = ts
