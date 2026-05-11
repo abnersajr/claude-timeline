@@ -1,4 +1,4 @@
-import { mkdirSync, rmSync } from "node:fs"
+import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import Database from "better-sqlite3"
@@ -9,6 +9,7 @@ import {
   getProcessedFiles,
   getSession,
   getTurns,
+  listJsonlSessions,
   listSessions,
   SessionNotFoundError,
 } from "../src/db-reader.js"
@@ -220,5 +221,106 @@ describe("getProcessedFiles", () => {
   test("returns empty array when table does not exist", () => {
     const files = getProcessedFiles(dbPath)
     expect(files).toEqual([])
+  })
+})
+
+describe("listJsonlSessions (JSONL-only sessions)", () => {
+  let projectsDir: string
+  let emptyDbPath: string
+
+  beforeEach(() => {
+    const dir = join(tmpdir(), `jsonl-test-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+    mkdirSync(dir, { recursive: true })
+    emptyDbPath = join(dir, "empty.db")
+    projectsDir = join(dir, "projects")
+    mkdirSync(projectsDir, { recursive: true })
+
+    // Create empty SQLite DB with required tables
+    const db = new Database(emptyDbPath)
+    db.exec(`CREATE TABLE sessions (session_id TEXT PRIMARY KEY)`)
+    db.exec(`CREATE TABLE processed_files (path TEXT PRIMARY KEY, mtime REAL, lines INTEGER)`)
+    db.close()
+  })
+
+  afterEach(() => {
+    try {
+      rmSync(join(projectsDir, ".."), { recursive: true, force: true })
+    } catch {}
+  })
+
+  test("detects string content in user messages (Bug 1)", () => {
+    const sessionId = "test-jsonl-string-content-001"
+    const projectDir = join(projectsDir, "test-project")
+    mkdirSync(projectDir, { recursive: true })
+
+    const jsonlLines = [
+      JSON.stringify({
+        type: "user",
+        timestamp: "2026-05-10T10:00:00.000Z",
+        message: { role: "user", content: "Hello, can you help me?" },
+      }),
+      JSON.stringify({
+        type: "user",
+        timestamp: "2026-05-10T10:00:05.000Z",
+        message: { role: "user", content: "Follow-up question" },
+      }),
+    ]
+    writeFileSync(join(projectDir, `${sessionId}.jsonl`), jsonlLines.join("\n"))
+
+    const results = listJsonlSessions(projectsDir, emptyDbPath)
+    expect(results).toHaveLength(1)
+    const summary = results[0]
+
+    // Bug 1 fix: lastTimestamp should be from the file, not new Date()
+    expect(summary.lastTimestamp).toBe("2026-05-10T10:00:05.000Z")
+    expect(summary.turnCount).toBe(2) // two user messages
+  })
+
+  test("does not inflate activeDuration from non-contentful records (Bug 2)", () => {
+    const sessionId = "test-jsonl-no-inflate-002"
+    const projectDir = join(projectsDir, "test-project")
+    mkdirSync(projectDir, { recursive: true })
+
+    const jsonlLines = [
+      JSON.stringify({
+        type: "user",
+        timestamp: "2026-05-10T10:00:00.000Z",
+        message: { role: "user", content: "Only one real message" },
+      }),
+    ]
+    writeFileSync(join(projectDir, `${sessionId}.jsonl`), jsonlLines.join("\n"))
+
+    const results = listJsonlSessions(projectsDir, emptyDbPath)
+    expect(results).toHaveLength(1)
+    const summary = results[0]
+
+    // With only one timestamp, active duration should be 0
+    expect(summary.activeDurationMs).toBe(0)
+  })
+
+  test("falls back to last file timestamp, not new Date() (Bug 3)", () => {
+    const sessionId = "test-jsonl-fallback-003"
+    const projectDir = join(projectsDir, "test-project")
+    mkdirSync(projectDir, { recursive: true })
+
+    const beforeMs = Date.now()
+    const jsonlLines = [
+      JSON.stringify({
+        type: "user",
+        timestamp: "2026-05-10T12:30:00.000Z",
+        message: { role: "user", content: "A message" },
+      }),
+    ]
+    writeFileSync(join(projectDir, `${sessionId}.jsonl`), jsonlLines.join("\n"))
+
+    const results = listJsonlSessions(projectsDir, emptyDbPath)
+    const afterMs = Date.now()
+    expect(results).toHaveLength(1)
+    const summary = results[0]
+
+    // Should use file timestamp, not current time
+    expect(summary.lastTimestamp).toBe("2026-05-10T12:30:00.000Z")
+    const resultTime = new Date(summary.lastTimestamp).getTime()
+    expect(resultTime).toBeLessThanOrEqual(beforeMs)
   })
 })
