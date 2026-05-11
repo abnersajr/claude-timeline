@@ -2,6 +2,7 @@ import { buildConversationGroups } from "./conversation-groups"
 import { computeContextStats } from "./context-tracker"
 import { getSession, getTurns } from "./db-reader"
 import { parseSessionJsonl } from "./jsonl-parser"
+import { classifyMessage } from "./classifier"
 import { calculateSessionCost } from "./pricing"
 import { detectSessionState } from "./session-state"
 import { listSubagentFiles } from "./subagent-locator"
@@ -22,7 +23,28 @@ export function matchTurnsToMessages(
 ): Turn[] {
   if (messages.length === 0 && (!toolCalls || toolCalls.length === 0)) return turns
 
-  // Track which messages have been matched
+  // Pre-pass: separate user text records from others
+  const USER_TEXT_WINDOW = 10000 // 10 seconds for user text
+  const OTHER_WINDOW = 5000     // 5 seconds for assistant/tool records
+
+  const userIdxSet = new Set<number>()
+  const otherIdxSet = new Set<number>()
+  for (let i = 0; i < messages.length; i++) {
+    const m = messages[i]
+    if (!m.timestamp) {
+      otherIdxSet.add(i)
+      continue
+    }
+    const category = classifyMessage(m)
+    if (category === "user") {
+      userIdxSet.add(i)
+    } else if (category !== "hardNoise") {
+      otherIdxSet.add(i)
+    }
+    // hardNoise records are excluded from matching entirely
+  }
+
+  // Track which messages have been matched (both pools share this set)
   const matchedMsgIndices = new Set<number>()
   // Track which tool calls have been matched
   const matchedTcIndices = new Set<number>()
@@ -32,34 +54,61 @@ export function matchTurnsToMessages(
     const matchedMessages: RawJsonlRecord[] = []
     const matchedToolCalls: import("./types.js").ToolCall[] = []
 
-    // Find closest unmatched message within 5 seconds
-    let bestMsgIndex = -1
-    let bestMsgDiff = Number.MAX_VALUE
-
-    for (let i = 0; i < messages.length; i++) {
+    // Pass 1: Try to match a user text record within expanded window (10s)
+    let bestUserIndex = -1
+    let bestUserDiff = Number.MAX_VALUE
+    for (const i of userIdxSet) {
       if (matchedMsgIndices.has(i)) continue
       const msg = messages[i]
       if (!msg.timestamp) continue
       const msgTime = new Date(msg.timestamp).getTime()
       const diff = Math.abs(turnTime - msgTime)
-      if (diff < 5000 && diff < bestMsgDiff) {
-        bestMsgDiff = diff
-        bestMsgIndex = i
+      if (diff < USER_TEXT_WINDOW && diff < bestUserDiff) {
+        bestUserDiff = diff
+        bestUserIndex = i
       }
     }
-
-    if (bestMsgIndex >= 0) {
-      matchedMessages.push(messages[bestMsgIndex])
-      matchedMsgIndices.add(bestMsgIndex)
+    if (bestUserIndex >= 0) {
+      matchedMessages.push(messages[bestUserIndex])
+      matchedMsgIndices.add(bestUserIndex)
     }
 
-    // Fallback: index-based matching (use first unmatched)
+    // Pass 2: Try to match other records (assistant, tool_result, etc.) within 5s
+    let bestOtherIndex = -1
+    let bestOtherDiff = Number.MAX_VALUE
+    for (const i of otherIdxSet) {
+      if (matchedMsgIndices.has(i)) continue
+      const msg = messages[i]
+      if (!msg.timestamp) continue
+      const msgTime = new Date(msg.timestamp).getTime()
+      const diff = Math.abs(turnTime - msgTime)
+      if (diff < OTHER_WINDOW && diff < bestOtherDiff) {
+        bestOtherDiff = diff
+        bestOtherIndex = i
+      }
+    }
+    if (bestOtherIndex >= 0) {
+      matchedMessages.push(messages[bestOtherIndex])
+      matchedMsgIndices.add(bestOtherIndex)
+    }
+
+    // Fallback: index-based matching (use first unmatched non-noise record)
     if (matchedMessages.length === 0) {
       for (let i = 0; i < messages.length; i++) {
-        if (!matchedMsgIndices.has(i)) {
+        if (!matchedMsgIndices.has(i) && otherIdxSet.has(i)) {
           matchedMessages.push(messages[i])
           matchedMsgIndices.add(i)
           break
+        }
+      }
+      // If still nothing, try any unmatched non-noise record
+      if (matchedMessages.length === 0) {
+        for (let i = 0; i < messages.length; i++) {
+          if (!matchedMsgIndices.has(i)) {
+            matchedMessages.push(messages[i])
+            matchedMsgIndices.add(i)
+            break
+          }
         }
       }
     }
@@ -79,11 +128,14 @@ export function matchTurnsToMessages(
     }
 
     // Convert RawJsonlRecord to Message
-    const normalizedMessages: Message[] = matchedMessages.map((m) => ({
-      type: (m.type as "assistant" | "user" | "system") ?? "assistant",
-      timestamp: m.timestamp,
-      content: normalizeContent(m.message?.content ?? []),
-    }))
+    const normalizedMessages: Message[] = matchedMessages.map((m) => {
+      const category = classifyMessage(m)
+      return {
+        type: category === "user" ? "user" : "assistant",
+        timestamp: m.timestamp,
+        content: normalizeContent(m.message?.content ?? []),
+      }
+    })
 
     // Apply JSONL cache breakdown if available (preferred over DB total)
     let mergedTokenUsage = turn.tokenUsage
@@ -117,7 +169,45 @@ export function matchTurnsToMessages(
     }
   })
 
-  return matched
+  // Collect any unmatched user text records and create synthetic turns for them
+  const unmatchedUserTexts: RawJsonlRecord[] = []
+  for (const i of userIdxSet) {
+    if (!matchedMsgIndices.has(i)) {
+      unmatchedUserTexts.push(messages[i])
+    }
+  }
+
+  if (unmatchedUserTexts.length === 0) return matched
+
+  // Create synthetic turns for unmatched user text
+  const syntheticTurns: Turn[] = unmatchedUserTexts.map((r) => ({
+    timestamp: r.timestamp!,
+    tokenUsage: {
+      inputTokens: 0,
+      outputTokens: 0,
+      cacheReadTokens: 0,
+      cacheCreation5mTokens: 0,
+      cacheCreation1hTokens: 0,
+    },
+    messages: [
+      {
+        type: "user" as const,
+        timestamp: r.timestamp,
+        content: normalizeContent(r.message?.content ?? []),
+      },
+    ],
+    toolCalls: [],
+    cacheWriteType: "none" as const,
+    cacheReadType: "unknown" as const,
+    cacheCreationTokensThisTurn: 0,
+  }))
+
+  // Merge and sort by timestamp
+  const allTurns = [...matched, ...syntheticTurns].sort(
+    (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
+  )
+
+  return allTurns
 }
 
 /**
@@ -127,30 +217,36 @@ function normalizeContent(content: Array<Record<string, unknown>> | string): Mes
   if (typeof content === "string") {
     return [{ type: "text" as const, text: content }]
   }
-  return content.map((block) => {
-    const type = block.type as string
-    if (type === "text") {
-      return { type: "text" as const, text: String(block.text ?? "") }
-    }
-    if (type === "tool_use") {
-      return {
-        type: "tool_use" as const,
-        name: String(block.name ?? ""),
-        input: (block.input as Record<string, unknown>) ?? {},
-        toolUseId: String(block.id ?? block.toolUseId ?? ""),
+  return content
+    .filter((block) => {
+      // Skip thinking blocks — they're internal model reasoning, not user-facing content
+      if (block.type === "thinking") return false
+      return true
+    })
+    .map((block) => {
+      const type = block.type as string
+      if (type === "text") {
+        return { type: "text" as const, text: String(block.text ?? "") }
       }
-    }
-    if (type === "tool_result") {
-      return {
-        type: "tool_result" as const,
-        toolUseId: String(block.toolUseId ?? ""),
-        content: block.content ?? "",
-        isError: block.isError as boolean | undefined,
+      if (type === "tool_use") {
+        return {
+          type: "tool_use" as const,
+          name: String(block.name ?? ""),
+          input: (block.input as Record<string, unknown>) ?? {},
+          toolUseId: String(block.id ?? block.toolUseId ?? ""),
+        }
       }
-    }
-    // Fallback to text
-    return { type: "text" as const, text: JSON.stringify(block) }
-  })
+      if (type === "tool_result") {
+        return {
+          type: "tool_result" as const,
+          toolUseId: String(block.toolUseId ?? ""),
+          content: block.content ?? "",
+          isError: block.isError as boolean | undefined,
+        }
+      }
+      // Fallback to text
+      return { type: "text" as const, text: JSON.stringify(block) }
+    })
 }
 
 /**

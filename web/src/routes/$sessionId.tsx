@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router"
 import { useQuery } from "@tanstack/react-query"
 import { fetchSession } from "@/lib/api"
 import { OverviewCard } from "@/components/session/overview-card"
-import { Timeline } from "@/components/session/timeline"
+import { ChatTimeline } from "@/components/session/chat-timeline"
 import { TokenChart } from "@/components/session/token-chart"
 import { CostBreakdown } from "@/components/session/cost-breakdown"
 import { ContextStats } from "@/components/session/context-stats"
@@ -61,7 +61,8 @@ function SessionDetailContent() {
         <CostBreakdown pricing={data.pricing} turns={data.turns} />
       </div>
 
-      <Timeline
+      <ChatTimeline
+        conversationGroups={data.conversationGroups ?? []}
         turns={data.turns}
         turnsPricing={data.pricing.turnsPricing}
         subagents={data.subagents}

@@ -4,7 +4,7 @@ import { useState } from "react"
 import type { Turn, TurnPricing } from "@timeline/types"
 import { cn, formatCost, formatTimestamp } from "@/lib/utils"
 import { TokenBadgeGroup } from "./token-badge"
-import { ToolCallList } from "./tool-call"
+import { ToolCallList, ToolCallPills } from "./tool-call"
 
 interface TurnCardProps {
   turn: Turn
@@ -137,35 +137,6 @@ function MessagePreview({
         >
           +{hiddenCount} more message{hiddenCount > 1 ? "s" : ""}
         </button>
-      )}
-    </div>
-  )
-}
-
-/** Tool call name pills shown in collapsed state */
-function ToolCallPills({ toolCalls }: { toolCalls: Turn["toolCalls"] }) {
-  const maxShow = 6
-  const visible = toolCalls.slice(0, maxShow)
-  const hidden = toolCalls.length - maxShow
-
-  return (
-    <div className="flex flex-wrap gap-1">
-      {visible.map((tc) => (
-        <span
-          key={tc.toolUseId}
-          className={cn(
-            "rounded bg-orange-500/10 px-1.5 py-0.5 text-[10px] text-orange-400",
-            tc.isTask &&
-              "border border-violet-500/30 bg-violet-500/10 text-violet-400",
-          )}
-        >
-          {tc.name}
-        </span>
-      ))}
-      {hidden > 0 && (
-        <span className="text-[10px] text-muted-foreground">
-          +{hidden} more
-        </span>
       )}
     </div>
   )

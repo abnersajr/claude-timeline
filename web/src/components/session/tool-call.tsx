@@ -104,7 +104,7 @@ export function ToolCallItem({ toolCall, className }: ToolCallItemProps) {
         {/* Status + expand hint */}
         <div className="flex items-center gap-2">
           {hasResult && <StatusDot isError={toolCall.isError} />}
-          <span className="text-[10px] text-muted-foreground opacity-0 transition-opacity group-hover/tc:opacity-100">
+          <span className="text-sm text-muted-foreground opacity-0 transition-opacity group-hover/tc:opacity-100">
             {open ? "collapse" : "expand"}
           </span>
         </div>
@@ -119,7 +119,7 @@ export function ToolCallItem({ toolCall, className }: ToolCallItemProps) {
         <div className="space-y-2 px-3 pb-3 pt-1">
           {/* Full input */}
           <div>
-            <span className="mb-1 block text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            <span className="mb-1 block text-sm font-medium uppercase tracking-wider text-muted-foreground">
               Input
             </span>
             <pre className="max-h-48 overflow-auto rounded-md bg-accent p-2.5 font-mono text-xs text-muted-foreground whitespace-pre-wrap break-all">
@@ -130,7 +130,7 @@ export function ToolCallItem({ toolCall, className }: ToolCallItemProps) {
           {/* Result */}
           {hasResult && (
             <div>
-              <span className="mb-1 flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+              <span className="mb-1 flex items-center gap-1.5 text-sm font-medium uppercase tracking-wider text-muted-foreground">
                 Result
                 {toolCall.isError && (
                   <span className="rounded bg-red-500/15 px-1 py-0.5 text-red-500">
@@ -147,14 +147,14 @@ export function ToolCallItem({ toolCall, className }: ToolCallItemProps) {
           {/* Task metadata */}
           {toolCall.isTask && toolCall.taskDescription && (
             <div className="rounded-md border border-orange-500/20 bg-orange-500/5 p-2.5">
-              <span className="mb-1 block text-[10px] font-medium uppercase tracking-wider text-orange-500">
+              <span className="mb-1 block text-sm font-medium uppercase tracking-wider text-orange-500">
                 Subagent Task
               </span>
               <p className="text-xs text-muted-foreground">
                 {toolCall.taskDescription}
               </p>
               {toolCall.taskSubagentType && (
-                <span className="mt-1 inline-block rounded bg-orange-500/15 px-1.5 py-0.5 text-[10px] text-orange-500">
+                <span className="mt-1 inline-block rounded bg-orange-500/15 px-1.5 py-0.5 text-sm text-orange-500">
                   {toolCall.taskSubagentType}
                 </span>
               )}
@@ -163,6 +163,40 @@ export function ToolCallItem({ toolCall, className }: ToolCallItemProps) {
         </div>
       </Collapsible.Panel>
     </Collapsible.Root>
+  )
+}
+
+/** Compact tool call name pills for collapsed view */
+interface ToolCallPillsProps {
+  toolCalls: ToolCall[]
+  className?: string
+}
+
+export function ToolCallPills({ toolCalls, className }: ToolCallPillsProps) {
+  const maxShow = 6
+  const visible = toolCalls.slice(0, maxShow)
+  const hidden = toolCalls.length - maxShow
+
+  return (
+    <div className={cn("flex flex-wrap gap-1", className)}>
+      {visible.map((tc) => (
+        <span
+          key={tc.toolUseId}
+          className={cn(
+            "rounded-md border border-orange-500/20 bg-orange-500/10 px-2 py-0.5 text-sm font-medium text-orange-400",
+            tc.isTask &&
+              "border-violet-500/30 bg-violet-500/10 text-violet-400",
+          )}
+        >
+          {tc.name}
+        </span>
+      ))}
+      {hidden > 0 && (
+        <span className="text-sm text-muted-foreground">
+          +{hidden} more
+        </span>
+      )}
+    </div>
   )
 }
 
@@ -186,7 +220,7 @@ export function ToolCallList({
 
   return (
     <div className={cn("space-y-0.5", className)}>
-      <span className="mb-1 block px-3 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+      <span className="mb-1 block px-3 text-sm font-medium uppercase tracking-wider text-muted-foreground">
         Tool Calls ({toolCalls.length})
       </span>
       {visible.map((tc) => (
