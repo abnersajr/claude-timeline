@@ -385,6 +385,7 @@ function parseJsonlSummary(
     let totalCacheRead = 0
     let totalCacheCreation5m = 0
     let totalCacheCreation1h = 0
+    let lastFileTimestamp = ""
     const allTimestamps: string[] = []
 
     for (const record of records) {
@@ -394,14 +395,13 @@ function parseJsonlSummary(
 
       // Track timestamps — only from records with actual content
       const ts = record.timestamp
+      if (ts) lastFileTimestamp = ts
       const hasContent = (totalInput + totalOutput + totalCacheRead + totalCacheCreation5m + totalCacheCreation1h > 0) ||
         (msg?.usage as Record<string, unknown> | undefined != null) ||
+        (typeof msg?.content === "string" && (msg.content as string).length > 0) ||
         (Array.isArray((msg?.content as unknown[]) ?? []) && ((msg?.content as unknown[]) ?? []).length > 0)
       if (ts && hasContent) {
         lastTimestamp = ts
-        allTimestamps.push(ts)
-      } else if (ts) {
-        // Still track for potential fallback, but don't use for endTime
         allTimestamps.push(ts)
       }
 
@@ -444,14 +444,14 @@ function parseJsonlSummary(
         cacheCreation1hTokens: totalCacheCreation1h,
       },
       startTime: "",
-      endTime: lastTimestamp || new Date().toISOString(),
+      endTime: lastTimestamp || lastFileTimestamp || new Date().toISOString(),
       isOngoing: false,
     }
     const syntheticTurns: Turn[] =
       totalInput > 0 || totalOutput > 0
         ? [
             {
-              timestamp: lastTimestamp || new Date().toISOString(),
+              timestamp: lastTimestamp || lastFileTimestamp || new Date().toISOString(),
               tokenUsage: session.totalTokens,
               messages: [],
               toolCalls: [],
@@ -472,7 +472,7 @@ function parseJsonlSummary(
       projectName,
       model,
       turnCount,
-      lastTimestamp: lastTimestamp || new Date().toISOString(),
+      lastTimestamp: lastTimestamp || lastFileTimestamp || new Date().toISOString(),
       totalCostEstimate: pricing.totalCost,
       activeDurationMs: computeActiveDurationMs(allTimestamps),
     }
