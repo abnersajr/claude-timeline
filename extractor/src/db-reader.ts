@@ -401,9 +401,6 @@ function parseJsonlSummary(
       if (ts && hasContent) {
         lastTimestamp = ts
         allTimestamps.push(ts)
-      } else if (ts) {
-        // Still track for potential fallback, but don't use for endTime
-        allTimestamps.push(ts)
       }
 
       // Extract model from assistant messages
