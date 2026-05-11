@@ -71,6 +71,9 @@ export function OverviewCard({ session, pricing, className }: OverviewCardProps)
         <StatItem label="Total Tokens" value={formatTokens(totalTokens)} />
         <StatItem label="Cost" value={formatCost(pricing.totalCost)} accent />
         <StatItem label="Duration" value={formatDuration(durationMs)} />
+        {session.activeDurationMs != null && session.activeDurationMs > 0 && (
+          <StatItem label="Active Time" value={formatDuration(session.activeDurationMs)} accent />
+        )}
         <StatItem
           label="Input Tokens"
           value={formatTokens(session.totalTokens.inputTokens)}

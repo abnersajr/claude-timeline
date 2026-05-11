@@ -130,6 +130,7 @@ export interface SessionMetadata {
   startTime: string
   endTime: string
   isOngoing: boolean
+  activeDurationMs?: number
 }
 
 /** Model pricing config */
