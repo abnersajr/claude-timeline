@@ -131,6 +131,7 @@ export interface SessionMetadata {
   endTime: string
   isOngoing: boolean
   activeDurationMs?: number
+  costCaptureAvailable?: boolean   // true if cost-stream.db has data for this session
 }
 
 /** Model pricing config */
@@ -155,8 +156,20 @@ export interface TurnPricing {
 
 /** Session-level pricing */
 export interface SessionPricing {
-  totalCost: number
-  turnsPricing: TurnPricing[]
+  // ── Estimated stream (always available, from JSONL × pricing rates) ──
+  estimatedTotalCost: number       // JSONL tokens × pricing rates
+  turnsPricing: TurnPricing[]      // per-turn breakdown (always from estimated)
+
+  // ── API stream (when cost-capture is active) ──
+  apiTotalCost: number | null      // from cost-stream.db (null = not available)
+  apiSnapshotCount: number         // how many snapshots were captured
+  apiLastSnapshotAt: string | null // last snapshot timestamp
+
+  // ── Preferred (based on global setting) ──
+  totalCost: number                // the "primary" display value
+  costSource: "api" | "estimated"  // which stream is primary
+
+  // ── Shared ──
   pricingRate: PricingRate
 }
 

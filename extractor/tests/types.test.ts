@@ -234,7 +234,12 @@ describe("TurnPricing", () => {
 describe("SessionPricing", () => {
   test("composes correctly", () => {
     const pricing: SessionPricing = {
+      estimatedTotalCost: 0.63,
+      apiTotalCost: null,
+      apiSnapshotCount: 0,
+      apiLastSnapshotAt: null,
       totalCost: 0.63,
+      costSource: "estimated",
       turnsPricing: [],
       pricingRate: {
         model: "claude-sonnet-4-6",
@@ -271,7 +276,12 @@ describe("FullTimelineSession", () => {
       },
       turns: [],
       pricing: {
+        estimatedTotalCost: 0,
+        apiTotalCost: null,
+        apiSnapshotCount: 0,
+        apiLastSnapshotAt: null,
         totalCost: 0,
+        costSource: "estimated",
         turnsPricing: [],
         pricingRate: {
           model: "claude-sonnet-4-6",
