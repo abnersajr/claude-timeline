@@ -53,6 +53,13 @@ export interface RawJsonlRecord {
     content: unknown
     isError?: boolean
   }
+  attachment?: {
+    type: string
+    hookName?: string
+    toolUseID?: string
+    stdout?: string
+    [key: string]: unknown
+  }
 }
 
 /** Text content block */
@@ -101,6 +108,10 @@ export interface ToolCall {
   taskDescription?: string
   /** Subagent type, extracted from Task tool input */
   taskSubagentType?: string
+  /** Rewritten command from a PreToolUse hook (e.g. RTK proxy) */
+  hookRewrite?: {
+    command: string
+  }
 }
 
 /** Single API call record */

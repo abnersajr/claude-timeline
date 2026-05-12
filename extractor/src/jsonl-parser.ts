@@ -30,6 +30,37 @@ export function parseSessionJsonl(
   const content = readFileSync(jsonlPath, "utf-8")
   const lines = content.split("\n").filter((line) => line.trim().length > 0)
 
+  // ── Pass 1: Extract hook rewrites from attachment records ──
+  // hook_success attachments (e.g. RTK PreToolUse:Bash) contain the
+  // rewritten command that was actually executed. We extract these
+  // BEFORE noise filtering so we can attach them to matching tool calls.
+  const hookRewrites = new Map<string, string>()
+  for (const line of lines) {
+    let entry: Record<string, unknown>
+    try {
+      entry = JSON.parse(line)
+    } catch {
+      continue
+    }
+    const att = entry.attachment as Record<string, unknown> | undefined
+    if (!att || att.type !== "hook_success") continue
+    if (att.hookName !== "PreToolUse:Bash") continue
+    const toolUseID = String(att.toolUseID ?? "")
+    const stdout = String(att.stdout ?? "")
+    if (!toolUseID || !stdout) continue
+    try {
+      const parsed = JSON.parse(stdout) as Record<string, unknown>
+      const hookOutput = parsed.hookSpecificOutput as Record<string, unknown> | undefined
+      const updatedInput = hookOutput?.updatedInput as Record<string, unknown> | undefined
+      const command = updatedInput?.command
+      if (typeof command === "string") {
+        hookRewrites.set(toolUseID, command)
+      }
+    } catch {
+      // malformed hook output, skip
+    }
+  }
+
   const rawMessages: RawJsonlRecord[] = []
   const toolCalls: ToolCall[] = []
   let malformedCount = 0
@@ -101,6 +132,16 @@ export function parseSessionJsonl(
           toolCalls[idx].result = resultStr
           toolCalls[idx].isError = isError
         }
+      }
+    }
+  }
+
+  // ── Attach hook rewrites to matching tool calls ──
+  if (hookRewrites.size > 0) {
+    for (const tc of toolCalls) {
+      const rewritten = hookRewrites.get(tc.toolUseId)
+      if (rewritten) {
+        tc.hookRewrite = { command: rewritten }
       }
     }
   }

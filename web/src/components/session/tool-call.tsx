@@ -11,7 +11,13 @@ interface ToolCallItemProps {
   className?: string
 }
 
-function truncateInput(input: Record<string, unknown>, maxLen = 80): string {
+function truncateInput(input: Record<string, unknown>, hookRewrite?: { command: string }, maxLen = 80): string {
+  // Prefer hook-rewritten command as preview (what actually ran)
+  if (hookRewrite?.command) {
+    const cmd = hookRewrite.command
+    return cmd.length > maxLen ? `${cmd.slice(0, maxLen)}…` : cmd
+  }
+
   const entries = Object.entries(input)
   if (entries.length === 0) return "{}"
 
@@ -32,7 +38,7 @@ function truncateInput(input: Record<string, unknown>, maxLen = 80): string {
 
   // Fallback: show key names
   const keys = entries.map(([k]) => k).slice(0, 3)
-  const suffix = entries.length > 3 ? `, +${entries.length - 3}` : ""
+  const suffix = entries.length > 3 ? ` +${entries.length - 3}` : ""
   return `{${keys.join(", ")}${suffix}}`
 }
 
@@ -52,7 +58,8 @@ function StatusDot({ isError }: { isError?: boolean }) {
 export function ToolCallItem({ toolCall, className }: ToolCallItemProps) {
   const [open, setOpen] = useState(false)
   const hasResult = toolCall.result != null && toolCall.result.length > 0
-  const inputSummary = truncateInput(toolCall.input)
+  const hasHookRewrite = toolCall.hookRewrite != null
+  const inputSummary = truncateInput(toolCall.input, toolCall.hookRewrite)
 
   return (
     <Collapsible.Root open={open} onOpenChange={setOpen} className={className}>
@@ -123,6 +130,18 @@ export function ToolCallItem({ toolCall, className }: ToolCallItemProps) {
               {JSON.stringify(toolCall.input, null, 2)}
             </pre>
           </div>
+
+          {/* Hook rewrite (e.g. RTK) */}
+          {hasHookRewrite && (
+            <div className="rounded-md border border-blue-500/20 bg-blue-500/5 p-2.5">
+              <span className="mb-1 block text-sm font-medium uppercase tracking-wider text-blue-500">
+                Hook Rewrite
+              </span>
+              <pre className="text-xs font-mono text-muted-foreground whitespace-pre-wrap break-all">
+                {toolCall.hookRewrite!.command}
+              </pre>
+            </div>
+          )}
 
           {/* Result — collapsible */}
           {hasResult && (
