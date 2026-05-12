@@ -10,7 +10,8 @@
   },
   "scripts": {
     "setup": "./scripts/localias-setup.sh",
-    "dev": "turbo dev",
+    "dev": "node scripts/dev.mjs",
+    "dev:https": "node scripts/dev.mjs --https",
     "dev:api": "turbo dev --filter=@timeline/api",
     "build": "turbo build",
     "test": "turbo test",
