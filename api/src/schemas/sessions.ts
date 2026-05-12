@@ -49,6 +49,9 @@ export const SessionSummarySchema = z.object({
   endTime: z.string(),
   isOngoing: z.boolean(),
   totalCost: z.number(),
+  costCaptureAvailable: z.boolean().optional(),
+  estimatedTotalCost: z.number().optional(),
+  apiTotalCost: z.number().nullable().optional(),
 })
 
 export type SessionSummary = z.infer<typeof SessionSummarySchema>
@@ -71,6 +74,8 @@ export const FullTimelineSessionSchema = z.object({
     startTime: z.string(),
     endTime: z.string(),
     isOngoing: z.boolean(),
+    activeDurationMs: z.number().optional(),
+    costCaptureAvailable: z.boolean().optional(),
   }),
   turns: z.array(z.any()),
   pricing: z.any(),

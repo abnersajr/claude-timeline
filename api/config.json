@@ -1,6 +1,6 @@
 {
   "port": 3099,
-  "corsOrigins": ["https://claude-dash.local", "http://localhost:5173"],
+  "corsOrigins": ["https://claude-dash.local", "http://localhost:5199", "http://localhost:5173"],
   "dbPath": null,
   "projectsDir": null
 }

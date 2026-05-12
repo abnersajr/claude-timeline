@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs"
 import { Router } from "express"
 import { z } from "zod/v4"
 import type { SessionCache } from "../cache.js"
@@ -47,7 +48,27 @@ export function createSessionsRouter(config: Config, cache: SessionCache): Route
       }
 
       merged.sort((a, b) => b.lastTimestamp.localeCompare(a.lastTimestamp))
-      res.json(merged)
+
+      // Add cost-source indicator
+      let costStreamDb: { hasCostData(id: string): boolean; close(): void } | null = null
+      if (existsSync(config.costStreamDbPath)) {
+        try {
+          const { CostStreamDb } = await import(
+            "@timeline/extractor/cost-stream-db" as string
+          )
+          costStreamDb = new CostStreamDb(config.costStreamDbPath)
+        } catch {
+          // DB locked or corrupted
+        }
+      }
+
+      const enriched = merged.map((s) => ({
+        ...s,
+        costCaptureAvailable: costStreamDb?.hasCostData(s.sessionId) ?? false,
+      }))
+
+      costStreamDb?.close()
+      res.json(enriched)
     } catch (err) {
       console.error("Failed to list sessions:", err)
       res.status(500).json({
@@ -109,6 +130,16 @@ export function createSessionsRouter(config: Config, cache: SessionCache): Route
         }
       }
 
+      // Enrich with cost-stream data (if available)
+      try {
+        const { enrichTimelineWithCostStream } = await import(
+          "@timeline/extractor/cost-stream-merger" as string
+        )
+        data = enrichTimelineWithCostStream(data, config.costStreamDbPath)
+      } catch {
+        // Cost-stream enrichment is non-critical — continue without it
+      }
+
       cache.set(sessionId, data, config.dbPath)
       res.json(data)
     } catch (err: unknown) {
@@ -153,7 +184,27 @@ export function createSessionsRouter(config: Config, cache: SessionCache): Route
 
       // Sort by most recent first
       merged.sort((a, b) => b.lastTimestamp.localeCompare(a.lastTimestamp))
-      res.json(merged)
+
+      // Add cost-source indicator
+      let costStreamDb: { hasCostData(id: string): boolean; close(): void } | null = null
+      if (existsSync(config.costStreamDbPath)) {
+        try {
+          const { CostStreamDb } = await import(
+            "@timeline/extractor/cost-stream-db" as string
+          )
+          costStreamDb = new CostStreamDb(config.costStreamDbPath)
+        } catch {
+          // DB locked or corrupted
+        }
+      }
+
+      const enriched = merged.map((s) => ({
+        ...s,
+        costCaptureAvailable: costStreamDb?.hasCostData(s.sessionId) ?? false,
+      }))
+
+      costStreamDb?.close()
+      res.json(enriched)
     } catch (err) {
       console.error("Failed to refresh sessions:", err)
       res.status(500).json({
@@ -209,6 +260,16 @@ export function createSessionsRouter(config: Config, cache: SessionCache): Route
         } else {
           throw err
         }
+      }
+
+      // Enrich with cost-stream data (if available)
+      try {
+        const { enrichTimelineWithCostStream } = await import(
+          "@timeline/extractor/cost-stream-merger" as string
+        )
+        data = enrichTimelineWithCostStream(data, config.costStreamDbPath)
+      } catch {
+        // Non-critical
       }
 
       cache.set(sessionId, data, config.dbPath)
