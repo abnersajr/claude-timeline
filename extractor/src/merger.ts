@@ -289,9 +289,9 @@ function normalizeContent(content: Array<Record<string, unknown>> | string): Mes
       if (type === "tool_result") {
         return {
           type: "tool_result" as const,
-          toolUseId: String(block.toolUseId ?? ""),
+          toolUseId: String(block.tool_use_id ?? block.toolUseId ?? ""),
           content: block.content ?? "",
-          isError: block.isError as boolean | undefined,
+          isError: (block.is_error ?? block.isError) as boolean | undefined,
         }
       }
       // Fallback to text
@@ -458,10 +458,22 @@ function buildTurnsFromJsonl(
 
     const matchedToolCalls = toolCallsByTurn.get(i) ?? []
 
+    // Skip zero-token noise: no tools, no meaningful content
     const usage = m.message?.usage
-    const cacheCreation = usage?.cache_creation
-    const cc5m = usage?.cacheCreation5mTokens ?? cacheCreation?.ephemeral_5m_input_tokens ?? 0
-    const cc1h = usage?.cacheCreation1hTokens ?? cacheCreation?.ephemeral_1h_input_tokens ?? 0
+    const totalTokens = (usage?.input_tokens ?? 0) + (usage?.output_tokens ?? 0) +
+      (usage?.cache_read_input_tokens ?? 0) +
+      (usage?.cache_creation?.ephemeral_5m_input_tokens ?? 0) +
+      (usage?.cache_creation?.ephemeral_1h_input_tokens ?? 0)
+    if (totalTokens === 0 && matchedToolCalls.length === 0) {
+      const content = m.message?.content
+      const hasMeaningfulContent = 
+        (typeof content === 'string' && content.length > 0 && !content.includes('No response requested')) ||
+        (Array.isArray(content) && content.some((b: Record<string, unknown>) => b.type === 'tool_use' || b.type === 'tool_result'))
+      if (!hasMeaningfulContent) continue
+    }
+
+    const cc5m = usage?.cacheCreation5mTokens ?? usage?.cache_creation?.ephemeral_5m_input_tokens ?? 0
+    const cc1h = usage?.cacheCreation1hTokens ?? usage?.cache_creation?.ephemeral_1h_input_tokens ?? 0
 
     turns.push({
       timestamp: m.timestamp ?? new Date().toISOString(),

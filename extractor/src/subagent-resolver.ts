@@ -414,9 +414,9 @@ function normalizeContent(content: Array<Record<string, unknown>> | string): Mes
     if (type === "tool_result") {
       return {
         type: "tool_result" as const,
-        toolUseId: String(block.toolUseId ?? ""),
+        toolUseId: String(block.tool_use_id ?? block.toolUseId ?? ""),
         content: block.content ?? "",
-        isError: block.isError as boolean | undefined,
+        isError: (block.is_error ?? block.isError) as boolean | undefined,
       }
     }
     return { type: "text" as const, text: JSON.stringify(block) }
