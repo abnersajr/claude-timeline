@@ -12,7 +12,11 @@ import { buildSessionSteps } from "@/lib/steps"
 // ---------------------------------------------------------------------------
 
 interface CostBreakdownProps {
-  pricing: SessionPricing
+  pricing: SessionPricing & {
+    estimatedTotalCost?: number
+    apiTotalCost?: number | null
+    costSource?: "api" | "estimated"
+  }
   turns: Turn[]
   className?: string
 }
@@ -196,11 +200,51 @@ export function CostBreakdown({ pricing, turns, className }: CostBreakdownProps)
   return (
     <div className={cn("rounded-xl border border-border bg-background p-6", className)}>
       {/* Header */}
-      <div className="mb-4 flex items-center justify-between">
-        <h3 className="text-sm font-semibold uppercase tracking-wider text-text-muted">
-          Cost Breakdown
-        </h3>
-        <span className="text-lg font-bold text-brand-400">{formatCost(totalCost)}</span>
+      <div className="mb-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold uppercase tracking-wider text-text-muted">
+            Cost Breakdown
+          </h3>
+          <div className="flex items-center gap-3">
+            {pricing.apiTotalCost != null && (
+              <span className="inline-flex items-center gap-1.5 text-sm">
+                <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                <span className="font-bold text-brand-400">{formatCost(pricing.apiTotalCost)}</span>
+                <span className="text-[0.625rem] text-text-muted">API</span>
+              </span>
+            )}
+            {pricing.apiTotalCost != null &&
+              pricing.estimatedTotalCost != null &&
+              pricing.apiTotalCost !== pricing.estimatedTotalCost && (
+                <span className="text-text-muted">/</span>
+              )}
+            {pricing.estimatedTotalCost != null && (
+              <span className="inline-flex items-center gap-1.5 text-sm">
+                <span className="inline-block h-1.5 w-1.5 rounded-full bg-muted-foreground/40" />
+                <span className="font-medium text-text-secondary">{formatCost(pricing.estimatedTotalCost)}</span>
+                <span className="text-[0.625rem] text-text-muted">est.</span>
+              </span>
+            )}
+            {pricing.apiTotalCost == null && pricing.estimatedTotalCost == null && (
+              <span className="text-lg font-bold text-brand-400">{formatCost(totalCost)}</span>
+            )}
+          </div>
+        </div>
+        {/* Difference indicator */}
+        {pricing.apiTotalCost != null &&
+          pricing.estimatedTotalCost != null &&
+          pricing.apiTotalCost !== pricing.estimatedTotalCost && (() => {
+            const diff = pricing.apiTotalCost - pricing.estimatedTotalCost
+            const pct = pricing.estimatedTotalCost > 0
+              ? (diff / pricing.estimatedTotalCost) * 100
+              : 0
+            return (
+              <p className="mt-1 text-[0.625rem] text-text-muted">
+                {diff > 0 ? "+" : ""}{pct.toFixed(1)}% difference
+                {pricing.costSource === "api" ? " \u2014 using API total" : " \u2014 using estimated"}
+              </p>
+            )
+          })()}
       </div>
 
       {/* Cost category bars */}
@@ -236,6 +280,11 @@ export function CostBreakdown({ pricing, turns, className }: CostBreakdownProps)
 
       {/* Per-step table */}
       <div className="mt-4">
+        {pricing.apiTotalCost != null && (
+          <p className="mb-2 text-[0.625rem] text-text-muted italic">
+            Per-step costs based on JSONL estimation (API provides session-level total only)
+          </p>
+        )}
         <PerStepTable turns={turns} turnsPricing={turnsPricing} />
       </div>
     </div>

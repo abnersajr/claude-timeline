@@ -27,8 +27,11 @@ export function SessionListRow({ session }: SessionListRowProps) {
           params={{ sessionId: session.sessionId }}
           className="font-medium text-foreground hover:text-primary hover:underline"
         >
-          {session.projectName}
+          {session.sessionId}
         </Link>
+        <div className="mt-0.5 text-sm text-foreground/70">
+          {session.projectName}
+        </div>
       </td>
       <td className="px-4 py-3 text-muted-foreground">
         <code className="rounded bg-accent px-1.5 py-0.5 text-xs">

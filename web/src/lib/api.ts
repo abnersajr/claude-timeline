@@ -7,6 +7,20 @@ export interface SessionSummary {
   turnCount: number
   lastTimestamp: string
   totalCostEstimate: number
+  costCaptureAvailable?: boolean
+}
+
+export interface CostStatus {
+  costCapture: {
+    installed: boolean
+    dbPath: string
+    sessionCount: number
+  }
+  costMethod: "api" | "estimated" | "auto"
+}
+
+export interface SettingsUpdate {
+  costMethod: "api" | "estimated" | "auto"
 }
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "https://api.claude-dash.local"
@@ -44,5 +58,23 @@ export async function refreshSessions(): Promise<SessionSummary[]> {
     method: "POST",
   })
   if (!res.ok) throw new Error(`Failed to refresh sessions: ${res.status}`)
+  return res.json()
+}
+
+export async function fetchStatus(): Promise<CostStatus> {
+  const res = await fetch(`${API_BASE}/api/status`)
+  if (!res.ok) throw new Error(`Failed to fetch status: ${res.status}`)
+  return res.json()
+}
+
+export async function updateCostMethod(
+  method: "api" | "estimated" | "auto",
+): Promise<{ costMethod: string }> {
+  const res = await fetch(`${API_BASE}/api/settings`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ costMethod: method }),
+  })
+  if (!res.ok) throw new Error(`Failed to update settings: ${res.status}`)
   return res.json()
 }

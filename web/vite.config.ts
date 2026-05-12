@@ -9,7 +9,7 @@ export default defineConfig({
     port: 5199,
     strictPort: true,
     host: true,
-    allowedHosts: ["claude-dash.local"],
+    allowedHosts: ["claude-dash.local", "localhost"],
   },
   resolve: {
     alias: {
