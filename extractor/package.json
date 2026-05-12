@@ -76,6 +76,14 @@
     "./noise-filter": {
       "import": "./dist/noise-filter.js",
       "types": "./dist/noise-filter.d.ts"
+    },
+    "./cost-stream-db": {
+      "import": "./dist/cost-stream-db.js",
+      "types": "./dist/cost-stream-db.d.ts"
+    },
+    "./cost-stream-merger": {
+      "import": "./dist/cost-stream-merger.js",
+      "types": "./dist/cost-stream-merger.d.ts"
     }
   },
   "engines": {

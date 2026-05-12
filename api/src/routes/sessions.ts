@@ -57,8 +57,8 @@ export function createSessionsRouter(config: Config, cache: SessionCache): Route
             "@timeline/extractor/cost-stream-db" as string
           )
           costStreamDb = new CostStreamDb(config.costStreamDbPath)
-        } catch {
-          // DB locked or corrupted
+        } catch (err) {
+          console.error("[sessions] cost-stream-db import failed:", err)
         }
       }
 
@@ -136,8 +136,8 @@ export function createSessionsRouter(config: Config, cache: SessionCache): Route
           "@timeline/extractor/cost-stream-merger" as string
         )
         data = enrichTimelineWithCostStream(data, config.costStreamDbPath)
-      } catch {
-        // Cost-stream enrichment is non-critical — continue without it
+      } catch (err) {
+        console.error("[sessions] cost-stream enrichment failed:", err)
       }
 
       cache.set(sessionId, data, config.dbPath)
@@ -193,8 +193,8 @@ export function createSessionsRouter(config: Config, cache: SessionCache): Route
             "@timeline/extractor/cost-stream-db" as string
           )
           costStreamDb = new CostStreamDb(config.costStreamDbPath)
-        } catch {
-          // DB locked or corrupted
+        } catch (err) {
+          console.error("[sessions] cost-stream-db import failed:", err)
         }
       }
 
@@ -268,8 +268,8 @@ export function createSessionsRouter(config: Config, cache: SessionCache): Route
           "@timeline/extractor/cost-stream-merger" as string
         )
         data = enrichTimelineWithCostStream(data, config.costStreamDbPath)
-      } catch {
-        // Non-critical
+      } catch (err) {
+        console.error("[sessions] cost-stream enrichment failed:", err)
       }
 
       cache.set(sessionId, data, config.dbPath)

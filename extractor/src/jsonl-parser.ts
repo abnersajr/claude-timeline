@@ -106,6 +106,29 @@ export function parseSessionJsonl(
   }
 
   const deduped = deduplicateByRequestId(rawMessages)
+
+  // Fix toolCall timestamps after dedup.
+  // Dedup merges thinking + tool_use records from the same API response into one
+  // record, using the earliest timestamp (thinking). But toolCalls were extracted
+  // before dedup with the tool_use record's later timestamp. This causes the
+  // merger to assign the toolCall to a different turn than the merged record.
+  // Fix: update each toolCall's timestamp to match its source merged record.
+  const toolUseIdToMergedTs = new Map<string, string>()
+  for (const rec of deduped) {
+    const content = rec.message?.content
+    if (!Array.isArray(content)) continue
+    for (const block of content) {
+      if (block.type === "tool_use") {
+        const id = String(block.id ?? block.toolUseId ?? "")
+        if (id && rec.timestamp) toolUseIdToMergedTs.set(id, rec.timestamp)
+      }
+    }
+  }
+  for (const tc of toolCalls) {
+    const mergedTs = toolUseIdToMergedTs.get(tc.toolUseId)
+    if (mergedTs) tc.timestamp = mergedTs
+  }
+
   const categories = deduped.map((r) => classifyMessage(r))
 
   return {
