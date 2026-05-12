@@ -1,7 +1,7 @@
 import type { ClassifiedMessage, MessageCategory, RawJsonlRecord } from "./types"
 
 /** Entry types that are always noise */
-const NOISE_TYPES = new Set(["system", "summary", "file-history-snapshot", "queue-operation", "attachment", "last-prompt", "permission-mode"])
+const NOISE_TYPES = new Set(["system", "summary", "file-history-snapshot", "queue-operation", "attachment", "last-prompt", "permission-mode", "ai-title"])
 
 /** Hard noise tags that should be filtered out entirely */
 const HARD_NOISE_TAGS = ["<local-command-caveat>", "<system-reminder>"]
