@@ -3,6 +3,7 @@ import { SessionCache } from "./cache.js"
 import type { Config } from "./config.js"
 import { healthRouter } from "./routes/health.js"
 import { createSessionsRouter } from "./routes/sessions.js"
+import { createStatusRouter } from "./routes/status.js"
 
 /**
  * Mount all API routes on the Express app.
@@ -11,7 +12,9 @@ import { createSessionsRouter } from "./routes/sessions.js"
 export function mountRoutes(app: Express, config: Config): void {
   const cache = new SessionCache()
   const sessionsRouter = createSessionsRouter(config, cache)
+  const statusRouter = createStatusRouter(config)
 
   app.use("/api", healthRouter)
   app.use("/api", sessionsRouter)
+  app.use("/api", statusRouter)
 }
