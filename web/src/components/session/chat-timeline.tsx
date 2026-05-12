@@ -234,7 +234,8 @@ function TurnRow({ turn, index, pricing, isFinalOutput }: { turn: Turn; index: n
       {/* Inline text preview (below the row) — skip for final output (shown as bubble) */}
       {text && !isFinalOutput && (
         <div className="mt-1 ml-6 text-sm text-foreground/70 break-words">
-          {text.length > 100 ? text.slice(0, 100) + "…" : text}
+          <span className="inline-block rounded bg-muted px-1 py-0.5 text-[10px] font-semibold text-muted-foreground mr-1.5 align-middle">text</span>
+          <span className="align-middle">{text}</span>
         </div>
       )}
 
