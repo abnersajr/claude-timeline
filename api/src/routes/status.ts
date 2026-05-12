@@ -28,8 +28,8 @@ export function createStatusRouter(config: Config): Router {
         const db = new CostStreamDb(config.costStreamDbPath)
         sessionCount = db.getSessionIds().length
         db.close()
-      } catch {
-        // DB might be locked or corrupted
+      } catch (err) {
+        console.error("[status] cost-stream-db import/query failed:", err)
       }
     }
 
@@ -60,7 +60,7 @@ export function createStatusRouter(config: Config): Router {
     try {
       dashConfig = JSON.parse(readFileSync(DASH_CONFIG_PATH, "utf-8"))
     } catch {
-      // File doesn't exist yet
+      // config.json doesn't exist yet — expected on first run
     }
 
     // Update costMethod
