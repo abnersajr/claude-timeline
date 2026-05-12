@@ -23,6 +23,7 @@ import { Timeline } from "./timeline"
 import {
   type Step,
   buildSessionSteps,
+  classifyStepTurn,
   computeGroupStepOffsets,
   getStepToolName,
 } from "@/lib/steps"
@@ -302,15 +303,21 @@ function StepRow({
   if (step.tools.length === 0) {
     if (anchorName) {
       summary = anchorHasContent ? `${anchorName} → result` : anchorName
+    } else if (anchorHasContent) {
+      const text = getAssistantText(step.anchor)!
+      summary = text.length > 60 ? text.slice(0, 60) + "…" : text
     } else {
       summary = "processing…"
     }
   } else if (!anchorName) {
     // PROCESSING anchor (no tool)
     const unique = [...new Set(step.toolNames)]
+    const prefix = anchorHasContent
+      ? getAssistantText(step.anchor)!.slice(0, 40)
+      : "processing…"
     summary = step.tools.length === 1
-      ? `processing… → ${step.toolNames[0]}`
-      : `processing… → [${unique.join(", ")}] ×${step.tools.length}`
+      ? `${prefix} → ${step.toolNames[0]}`
+      : `${prefix} → [${unique.join(", ")}] ×${step.tools.length}`
   } else {
     // TOOL_CALL anchor
     const unique = [...new Set(step.toolNames)]
@@ -425,6 +432,12 @@ function ProcessingTurns({
   return (
     <div className="space-y-0.5">
       {steps.map((step, i) => {
+        // Skip user-message steps — already rendered as chat bubbles
+        if (classifyStepTurn(step.anchor) === "user") {
+          // Still advance the offset for correct global turn numbering
+          offset += 1 + step.tools.length
+          return null
+        }
         const globalOffset = firstGlobalIdx + offset
         const stepSize = 1 + step.tools.length
         offset += stepSize
