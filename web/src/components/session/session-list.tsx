@@ -82,7 +82,7 @@ export function SessionList() {
         <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-border bg-surface-2/50 text-left">
-            <th className="px-4 py-3 font-medium text-text-primary">Project</th>
+            <th className="px-4 py-3 font-medium text-text-primary">Session</th>
             <th className="px-4 py-3 font-medium text-text-primary">Model</th>
             <th className="px-4 py-3 text-right font-medium text-text-primary">
               Turns
