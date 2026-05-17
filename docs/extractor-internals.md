@@ -219,8 +219,9 @@ Examples:
 9. `extractCommandExecuted(rawMessages)` — Extract slash command
 10. `detectSessionState(rawMessages)` — Ongoing vs completed
 11. `listSubagentFiles()` + `resolveSubagents()` — Subagent discovery
-12. `buildConversationGroups(enrichedTurns)` — Group turns
-13. `computeActiveDurationMs(enrichedTurns)` — Active time
+12. **Link parentTurnIndex** — Match each subagent's `parentTaskId` to a turn index for inline UI placement
+13. `buildConversationGroups(enrichedTurns)` — Group turns
+14. `computeActiveDurationMs(enrichedTurns)` — Active time
 
 **`extractJsonlTimeline(sessionId, projectsDir, jsonlPath)`** — JSONL only (no SQLite):
 
@@ -313,6 +314,14 @@ Token summing iterates deduped records (safe).
 - Detects parallel execution (100ms overlap window)
 - Aggregates tokens with request-id dedup
 - Parses subagent JSONL with same dedup pipeline
+- **Reads meta.json** alongside JSONL for `agentType` ("Explore", "general-purpose") and higher-quality `description`
+- **Computes totalCost** using `calculateTurnCost` with a synthetic Turn built from aggregated tokens + model
+- Falls back to JSONL-extracted description when meta.json is missing
+
+**Subagent type fields** (enriched):
+- `agentType?: string` — from meta.json (e.g. "Explore")
+- `totalCost?: number` — calculated from tokens × model pricing
+- `parentTurnIndex?: number` — linked in merger.ts for inline UI placement
 
 ### session-state.ts — Ongoing Detection
 

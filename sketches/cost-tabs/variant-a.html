@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cost Breakdown — Tabbed Variant</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      colors: {
+        surface: { 1: '#0a0a0f', 2: '#12121a', 3: '#1a1a25' },
+        border: '#2a2a35',
+        brand: { 400: '#818cf8' },
+      }
+    }
+  }
+}
+</script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0a0a0f; color: #e2e2e8; line-height: 1.5; -webkit-font-smoothing: antialiased; }
+  .tab-active { border-bottom: 2px solid #818cf8; color: #e2e2e8; }
+  .tab-inactive { border-bottom: 2px solid transparent; color: #6b6b80; }
+  .tab-inactive:hover { color: #a0a0b0; border-bottom-color: #2a2a35; }
+</style>
+</head>
+<body class="p-8">
+<h1 class="text-lg font-semibold mb-6 text-white">Variant: Tabbed Cost Breakdown</h1>
+
+<div class="max-w-xl rounded-xl border border-border bg-surface-1 p-6">
+  <!-- Header -->
+  <div class="mb-4">
+    <div class="flex items-center justify-between">
+      <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500">Cost Breakdown</h3>
+      <div class="flex items-center gap-3">
+        <span class="inline-flex items-center gap-1.5 text-sm">
+          <span class="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+          <span class="font-bold text-brand-400">$1.240</span>
+          <span class="text-[0.625rem] text-gray-500">API</span>
+        </span>
+        <span class="text-gray-600">/</span>
+        <span class="inline-flex items-center gap-1.5 text-sm">
+          <span class="inline-block h-1.5 w-1.5 rounded-full bg-gray-600"></span>
+          <span class="font-medium text-gray-400">$1.226</span>
+          <span class="text-[0.625rem] text-gray-500">est.</span>
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="flex gap-0 border-b border-border mb-4 overflow-x-auto">
+    <button class="tab-active px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors" onclick="switchTab(this, 'all')">
+      All Models
+      <span class="ml-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-400/20 px-1 text-[10px] font-bold text-brand-400">$1.226</span>
+    </button>
+    <button class="tab-inactive px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors" onclick="switchTab(this, 'main')">
+      Sonnet 4.6
+      <span class="ml-1.5 text-[10px] text-gray-500">$0.606</span>
+    </button>
+    <button class="tab-inactive px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors" onclick="switchTab(this, 'agent1')">
+      Haiku 4.5
+      <span class="ml-1.5 text-[10px] text-gray-500">$0.229</span>
+    </button>
+    <button class="tab-inactive px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors" onclick="switchTab(this, 'agent2')">
+      Haiku 4.5
+      <span class="ml-1.5 text-[10px] text-gray-500">$0.209</span>
+    </button>
+  </div>
+
+  <!-- Tab: All Models -->
+  <div id="tab-all" class="tab-content space-y-3">
+    <div class="flex items-center gap-3">
+      <span class="inline-block h-2.5 w-2.5 shrink-0 rounded-sm bg-blue-500"></span>
+      <span class="w-28 shrink-0 text-xs text-gray-500">Input</span>
+      <div class="relative h-2 flex-1 overflow-hidden rounded-full bg-surface-3">
+        <div class="absolute inset-y-0 left-0 rounded-full bg-blue-500" style="width: 0.5%"></div>
+      </div>
+      <span class="w-16 shrink-0 text-right text-xs font-medium text-gray-400">$0.001</span>
+      <span class="w-12 shrink-0 text-right text-xs text-gray-500">0.1%</span>
+    </div>
+    <div class="flex items-center gap-3">
+      <span class="inline-block h-2.5 w-2.5 shrink-0 rounded-sm bg-emerald-500"></span>
+      <span class="w-28 shrink-0 text-xs text-gray-500">Output</span>
+      <div class="relative h-2 flex-1 overflow-hidden rounded-full bg-surface-3">
+        <div class="absolute inset-y-0 left-0 rounded-full bg-emerald-500" style="width: 32%"></div>
+      </div>
+      <span class="w-16 shrink-0 text-right text-xs font-medium text-gray-400">$0.404</span>
+      <span class="w-12 shrink-0 text-right text-xs text-gray-500">32.5%</span>
+    </div>
+    <div class="flex items-center gap-3">
+      <span class="inline-block h-2.5 w-2.5 shrink-0 rounded-sm bg-amber-500"></span>
+      <span class="w-28 shrink-0 text-xs text-gray-500">Cache Read</span>
+      <div class="relative h-2 flex-1 overflow-hidden rounded-full bg-surface-3">
+        <div class="absolute inset-y-0 left-0 rounded-full bg-amber-500" style="width: 38%"></div>
+      </div>
+      <span class="w-16 shrink-0 text-right text-xs font-medium text-gray-400">$0.473</span>
+      <span class="w-12 shrink-0 text-right text-xs text-gray-500">38.1%</span>
+    </div>
+    <div class="flex items-center gap-3">
+      <span class="inline-block h-2.5 w-2.5 shrink-0 rounded-sm bg-violet-500"></span>
+      <span class="w-28 shrink-0 text-xs text-gray-500">Cache Write (5m)</span>
+      <div class="relative h-2 flex-1 overflow-hidden rounded-full bg-surface-3">
+        <div class="absolute inset-y-0 left-0 rounded-full bg-violet-500" style="width: 29%"></div>
+      </div>
+      <span class="w-16 shrink-0 text-right text-xs font-medium text-gray-400">$0.348</span>
+      <span class="w-12 shrink-0 text-right text-xs text-gray-500">28.0%</span>
+    </div>
+
+    <!-- Model breakdown summary -->
+    <div class="mt-4 rounded-lg bg-surface-2 p-3">
+      <h4 class="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-500">Models Used</h4>
+      <div class="space-y-1.5">
+        <div class="flex items-center justify-between text-sm">
+          <span class="text-gray-400">claude-sonnet-4-6 <span class="text-[10px] text-gray-600">(main)</span></span>
+          <span class="font-medium text-gray-300">$0.606 <span class="text-[10px] text-gray-600">49.4%</span></span>
+        </div>
+        <div class="flex items-center justify-between text-sm">
+          <span class="text-gray-400">claude-haiku-4-5 <span class="text-[10px] text-gray-600">(4 agents)</span></span>
+          <span class="font-medium text-gray-300">$0.620 <span class="text-[10px] text-gray-600">50.6%</span></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab: Sonnet (Main) -->
+  <div id="tab-main" class="tab-content hidden space-y-3">
+    <div class="flex items-center gap-3">
+      <span class="inline-block h-2.5 w-2.5 shrink-0 rounded-sm bg-blue-500"></span>
+      <span class="w-28 shrink-0 text-xs text-gray-500">Input</span>
+      <div class="relative h-2 flex-1 overflow-hidden rounded-full bg-surface-3">
+        <div class="absolute inset-y-0 left-0 rounded-full bg-blue-500" style="width: 0.8%"></div>
+      </div>
+      <span class="w-16 shrink-0 text-right text-xs font-medium text-gray-400">$0.001</span>
+      <span class="w-12 shrink-0 text-right text-xs text-gray-500">0.2%</span>
+    </div>
+    <div class="flex items-center gap-3">
+      <span class="inline-block h-2.5 w-2.5 shrink-0 rounded-sm bg-emerald-500"></span>
+      <span class="w-28 shrink-0 text-xs text-gray-500">Output</span>
+      <div class="relative h-2 flex-1 overflow-hidden rounded-full bg-surface-3">
+        <div class="absolute inset-y-0 left-0 rounded-full bg-emerald-500" style="width: 50%"></div>
+      </div>
+      <span class="w-16 shrink-0 text-right text-xs font-medium text-gray-400">$0.302</span>
+      <span class="w-12 shrink-0 text-right text-xs text-gray-500">49.8%</span>
+    </div>
+    <div class="flex items-center gap-3">
+      <span class="inline-block h-2.5 w-2.5 shrink-0 rounded-sm bg-amber-500"></span>
+      <span class="w-28 shrink-0 text-xs text-gray-500">Cache Read</span>
+      <div class="relative h-2 flex-1 overflow-hidden rounded-full bg-surface-3">
+        <div class="absolute inset-y-0 left-0 rounded-full bg-amber-500" style="width: 28%"></div>
+      </div>
+      <span class="w-16 shrink-0 text-right text-xs font-medium text-gray-400">$0.170</span>
+      <span class="w-12 shrink-0 text-right text-xs text-gray-500">28.1%</span>
+    </div>
+    <div class="flex items-center gap-3">
+      <span class="inline-block h-2.5 w-2.5 shrink-0 rounded-sm bg-violet-500"></span>
+      <span class="w-28 shrink-0 text-xs text-gray-500">Cache Write (5m)</span>
+      <div class="relative h-2 flex-1 overflow-hidden rounded-full bg-surface-3">
+        <div class="absolute inset-y-0 left-0 rounded-full bg-violet-500" style="width: 21%"></div>
+      </div>
+      <span class="w-16 shrink-0 text-right text-xs font-medium text-gray-400">$0.133</span>
+      <span class="w-12 shrink-0 text-right text-xs text-gray-500">21.9%</span>
+    </div>
+
+    <!-- Pricing rate for this model -->
+    <div class="mt-4 rounded-lg bg-surface-2 p-3">
+      <h4 class="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-500">Pricing Rate — claude-sonnet-4-6</h4>
+      <div class="space-y-1">
+        <div class="flex items-center justify-between text-xs"><span class="text-gray-500">Input</span><span class="font-medium text-gray-400">$3.00 / MTok</span></div>
+        <div class="flex items-center justify-between text-xs"><span class="text-gray-500">Output</span><span class="font-medium text-gray-400">$15.00 / MTok</span></div>
+        <div class="flex items-center justify-between text-xs"><span class="text-gray-500">Cache Read</span><span class="font-medium text-gray-400">$0.30 / MTok</span></div>
+        <div class="flex items-center justify-between text-xs"><span class="text-gray-500">Cache Write (5m)</span><span class="font-medium text-gray-400">$3.75 / MTok</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab: Agent 1 (Haiku) -->
+  <div id="tab-agent1" class="tab-content hidden space-y-3">
+    <div class="flex items-center gap-3">
+      <span class="inline-block h-2.5 w-2.5 shrink-0 rounded-sm bg-blue-500"></span>
+      <span class="w-28 shrink-0 text-xs text-gray-500">Input</span>
+      <div class="relative h-2 flex-1 overflow-hidden rounded-full bg-surface-3">
+        <div class="absolute inset-y-0 left-0 rounded-full bg-blue-500" style="width: 0.3%"></div>
+      </div>
+      <span class="w-16 shrink-0 text-right text-xs font-medium text-gray-400">$0.000</span>
+      <span class="w-12 shrink-0 text-right text-xs text-gray-500">0.1%</span>
+    </div>
+    <div class="flex items-center gap-3">
+      <span class="inline-block h-2.5 w-2.5 shrink-0 rounded-sm bg-emerald-500"></span>
+      <span class="w-28 shrink-0 text-xs text-gray-500">Output</span>
+      <div class="relative h-2 flex-1 overflow-hidden rounded-full bg-surface-3">
+        <div class="absolute inset-y-0 left-0 rounded-full bg-emerald-500" style="width: 16%"></div>
+      </div>
+      <span class="w-16 shrink-0 text-right text-xs font-medium text-gray-400">$0.037</span>
+      <span class="w-12 shrink-0 text-right text-xs text-gray-500">16.1%</span>
+    </div>
+    <div class="flex items-center gap-3">
+      <span class="inline-block h-2.5 w-2.5 shrink-0 rounded-sm bg-amber-500"></span>
+      <span class="w-28 shrink-0 text-xs text-gray-500">Cache Read</span>
+      <div class="relative h-2 flex-1 overflow-hidden rounded-full bg-surface-3">
+        <div class="absolute inset-y-0 left-0 rounded-full bg-amber-500" style="width: 49%"></div>
+      </div>
+      <span class="w-16 shrink-0 text-right text-xs font-medium text-gray-400">$0.117</span>
+      <span class="w-12 shrink-0 text-right text-xs text-gray-500">51.0%</span>
+    </div>
+    <div class="flex items-center gap-3">
+      <span class="inline-block h-2.5 w-2.5 shrink-0 rounded-sm bg-violet-500"></span>
+      <span class="w-28 shrink-0 text-xs text-gray-500">Cache Write (5m)</span>
+      <div class="relative h-2 flex-1 overflow-hidden rounded-full bg-surface-3">
+        <div class="absolute inset-y-0 left-0 rounded-full bg-violet-500" style="width: 35%"></div>
+      </div>
+      <span class="w-16 shrink-0 text-right text-xs font-medium text-gray-400">$0.075</span>
+      <span class="w-12 shrink-0 text-right text-xs text-gray-500">32.7%</span>
+    </div>
+
+    <!-- Pricing rate for Haiku -->
+    <div class="mt-4 rounded-lg bg-surface-2 p-3">
+      <h4 class="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-500">Pricing Rate — claude-haiku-4-5</h4>
+      <div class="space-y-1">
+        <div class="flex items-center justify-between text-xs"><span class="text-gray-500">Input</span><span class="font-medium text-gray-400">$1.00 / MTok</span></div>
+        <div class="flex items-center justify-between text-xs"><span class="text-gray-500">Output</span><span class="font-medium text-gray-400">$5.00 / MTok</span></div>
+        <div class="flex items-center justify-between text-xs"><span class="text-gray-500">Cache Read</span><span class="font-medium text-gray-400">$0.10 / MTok</span></div>
+        <div class="flex items-center justify-between text-xs"><span class="text-gray-500">Cache Write (5m)</span><span class="font-medium text-gray-400">$1.25 / MTok</span></div>
+      </div>
+    </div>
+
+    <!-- Agent info -->
+    <div class="mt-3 rounded-lg border border-border bg-surface-2 p-3">
+      <div class="flex items-center gap-2 text-sm">
+        <span class="inline-flex items-center rounded-full border border-violet-500/30 bg-violet-500/15 px-2 py-0.5 text-xs font-semibold text-violet-400">Explore</span>
+        <span class="text-gray-400">40 turns · 26 calls</span>
+        <span class="text-gray-600">·</span>
+        <span class="text-gray-400">1m 5s</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab: Agent 2 (Haiku) -->
+  <div id="tab-agent2" class="tab-content hidden space-y-3">
+    <div class="flex items-center gap-3">
+      <span class="inline-block h-2.5 w-2.5 shrink-0 rounded-sm bg-blue-500"></span>
+      <span class="w-28 shrink-0 text-xs text-gray-500">Input</span>
+      <div class="relative h-2 flex-1 overflow-hidden rounded-full bg-surface-3">
+        <div class="absolute inset-y-0 left-0 rounded-full bg-blue-500" style="width: 0.4%"></div>
+      </div>
+      <span class="w-16 shrink-0 text-right text-xs font-medium text-gray-400">$0.000</span>
+      <span class="w-12 shrink-0 text-right text-xs text-gray-500">0.1%</span>
+    </div>
+    <div class="flex items-center gap-3">
+      <span class="inline-block h-2.5 w-2.5 shrink-0 rounded-sm bg-emerald-500"></span>
+      <span class="w-28 shrink-0 text-xs text-gray-500">Output</span>
+      <div class="relative h-2 flex-1 overflow-hidden rounded-full bg-surface-3">
+        <div class="absolute inset-y-0 left-0 rounded-full bg-emerald-500" style="width: 18%"></div>
+      </div>
+      <span class="w-16 shrink-0 text-right text-xs font-medium text-gray-400">$0.031</span>
+      <span class="w-12 shrink-0 text-right text-xs text-gray-500">14.8%</span>
+    </div>
+    <div class="flex items-center gap-3">
+      <span class="inline-block h-2.5 w-2.5 shrink-0 rounded-sm bg-amber-500"></span>
+      <span class="w-28 shrink-0 text-xs text-gray-500">Cache Read</span>
+      <div class="relative h-2 flex-1 overflow-hidden rounded-full bg-surface-3">
+        <div class="absolute inset-y-0 left-0 rounded-full bg-amber-500" style="width: 52%"></div>
+      </div>
+      <span class="w-16 shrink-0 text-right text-xs font-medium text-gray-400">$0.113</span>
+      <span class="w-12 shrink-0 text-right text-xs text-gray-500">53.9%</span>
+    </div>
+    <div class="flex items-center gap-3">
+      <span class="inline-block h-2.5 w-2.5 shrink-0 rounded-sm bg-violet-500"></span>
+      <span class="w-28 shrink-0 text-xs text-gray-500">Cache Write (5m)</span>
+      <div class="relative h-2 flex-1 overflow-hidden rounded-full bg-surface-3">
+        <div class="absolute inset-y-0 left-0 rounded-full bg-violet-500" style="width: 31%"></div>
+      </div>
+      <span class="w-16 shrink-0 text-right text-xs font-medium text-gray-400">$0.065</span>
+      <span class="w-12 shrink-0 text-right text-xs text-gray-500">31.1%</span>
+    </div>
+
+    <!-- Pricing rate for Haiku -->
+    <div class="mt-4 rounded-lg bg-surface-2 p-3">
+      <h4 class="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-500">Pricing Rate — claude-haiku-4-5</h4>
+      <div class="space-y-1">
+        <div class="flex items-center justify-between text-xs"><span class="text-gray-500">Input</span><span class="font-medium text-gray-400">$1.00 / MTok</span></div>
+        <div class="flex items-center justify-between text-xs"><span class="text-gray-500">Output</span><span class="font-medium text-gray-400">$5.00 / MTok</span></div>
+        <div class="flex items-center justify-between text-xs"><span class="text-gray-500">Cache Read</span><span class="font-medium text-gray-400">$0.10 / MTok</span></div>
+        <div class="flex items-center justify-between text-xs"><span class="text-gray-500">Cache Write (5m)</span><span class="font-medium text-gray-400">$1.25 / MTok</span></div>
+      </div>
+    </div>
+
+    <!-- Agent info -->
+    <div class="mt-3 rounded-lg border border-border bg-surface-2 p-3">
+      <div class="flex items-center gap-2 text-sm">
+        <span class="inline-flex items-center rounded-full border border-violet-500/30 bg-violet-500/15 px-2 py-0.5 text-xs font-semibold text-violet-400">Explore</span>
+        <span class="text-gray-400">35 turns · 23 calls</span>
+        <span class="text-gray-600">·</span>
+        <span class="text-gray-400">58s</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function switchTab(btn, tab) {
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+  document.querySelectorAll('.tab-active').forEach(el => { el.classList.remove('tab-active'); el.classList.add('tab-inactive'); });
+  document.querySelectorAll('.tab-inactive').forEach(el => { if (el === btn) { el.classList.remove('tab-inactive'); el.classList.add('tab-active'); } });
+  document.getElementById('tab-' + tab).classList.remove('hidden');
+}
+</script>
+</body>
+</html>

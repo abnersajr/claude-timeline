@@ -1,15 +1,18 @@
 # Dependencies
 node_modules/
 extractor/node_modules/
+api/node_modules/
+types/node_modules/
+web/node_modules/
 
-# Lock files
-pnpm-lock.yaml
+# Lock files (keep pnpm-lock.yaml for reproducibility)
 skills-lock.json
 
 # Build outputs
 dist/
 build/
 *.tsbuildinfo
+.turbo/
 
 # Environment
 .env
@@ -25,6 +28,9 @@ pnpm-debug.log*
 .idea/
 .vscode/
 *.swp
+
+# Internal agent docs
+superpowers/
 *.swo
 
 # OS
@@ -40,3 +46,7 @@ Thumbs.db
 
 # Worktrees
 .worktrees/
+
+# TanStack Router
+tmp/
+routeTree.gen.ts

@@ -1,0 +1,159 @@
+{
+  "name": "claude-timeline",
+  "version": "1.0.0",
+  "description": "Extract and visualize Claude Code session timelines — conversations, tool calls, pricing, and tokens.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "claude-timeline": "./dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/abnersajr/claude-timeline"
+  },
+  "license": "MIT",
+  "keywords": [
+    "claude",
+    "anthropic",
+    "claude-code",
+    "timeline",
+    "session",
+    "extractor",
+    "tokenizer",
+    "cost-tracker"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./types": {
+      "types": "./dist/types.d.ts",
+      "import": "./dist/types.js",
+      "default": "./dist/types.js"
+    },
+    "./dedup": {
+      "types": "./dist/dedup.d.ts",
+      "import": "./dist/dedup.js",
+      "default": "./dist/dedup.js"
+    },
+    "./classifier": {
+      "types": "./dist/classifier.d.ts",
+      "import": "./dist/classifier.js",
+      "default": "./dist/classifier.js"
+    },
+    "./tool-extraction": {
+      "types": "./dist/tool-extraction.d.ts",
+      "import": "./dist/tool-extraction.js",
+      "default": "./dist/tool-extraction.js"
+    },
+    "./model-parser": {
+      "types": "./dist/model-parser.d.ts",
+      "import": "./dist/model-parser.js",
+      "default": "./dist/model-parser.js"
+    },
+    "./pricing": {
+      "types": "./dist/pricing.d.ts",
+      "import": "./dist/pricing.js",
+      "default": "./dist/pricing.js"
+    },
+    "./context-tracker": {
+      "types": "./dist/context-tracker.d.ts",
+      "import": "./dist/context-tracker.js",
+      "default": "./dist/context-tracker.js"
+    },
+    "./conversation-groups": {
+      "types": "./dist/conversation-groups.d.ts",
+      "import": "./dist/conversation-groups.js",
+      "default": "./dist/conversation-groups.js"
+    },
+    "./session-state": {
+      "types": "./dist/session-state.d.ts",
+      "import": "./dist/session-state.js",
+      "default": "./dist/session-state.js"
+    },
+    "./subagent-locator": {
+      "types": "./dist/subagent-locator.d.ts",
+      "import": "./dist/subagent-locator.js",
+      "default": "./dist/subagent-locator.js"
+    },
+    "./subagent-resolver": {
+      "types": "./dist/subagent-resolver.d.ts",
+      "import": "./dist/subagent-resolver.js",
+      "default": "./dist/subagent-resolver.js"
+    },
+    "./db-reader": {
+      "types": "./dist/db-reader.d.ts",
+      "import": "./dist/db-reader.js",
+      "default": "./dist/db-reader.js"
+    },
+    "./merger": {
+      "types": "./dist/merger.d.ts",
+      "import": "./dist/merger.js",
+      "default": "./dist/merger.js"
+    },
+    "./utils": {
+      "types": "./dist/utils.d.ts",
+      "import": "./dist/utils.js",
+      "default": "./dist/utils.js"
+    },
+    "./tool-matcher": {
+      "types": "./dist/tool-matcher.d.ts",
+      "import": "./dist/tool-matcher.js",
+      "default": "./dist/tool-matcher.js"
+    },
+    "./jsonl-parser": {
+      "types": "./dist/jsonl-parser.d.ts",
+      "import": "./dist/jsonl-parser.js",
+      "default": "./dist/jsonl-parser.js"
+    },
+    "./noise-filter": {
+      "types": "./dist/noise-filter.d.ts",
+      "import": "./dist/noise-filter.js",
+      "default": "./dist/noise-filter.js"
+    },
+    "./cost-stream-db": {
+      "types": "./dist/cost-stream-db.d.ts",
+      "import": "./dist/cost-stream-db.js",
+      "default": "./dist/cost-stream-db.js"
+    },
+    "./cost-stream-merger": {
+      "types": "./dist/cost-stream-merger.d.ts",
+      "import": "./dist/cost-stream-merger.js",
+      "default": "./dist/cost-stream-merger.js"
+    }
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=11.0.0"
+  },
+  "scripts": {
+    "build": "node ../scripts/build.mjs --cli",
+    "extract": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "lint": "@biomejs/biome check .",
+    "format": "@biomejs/biome format ."
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.7.0",
+    "chalk": "^5.6.2",
+    "commander": "^14.0.3",
+    "minimist": "^1.2.8"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.14",
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/minimist": "^1.2.5",
+    "@types/node": "^22.10.5",
+    "rolldown": "^1.0.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3",
+    "vitest": "^3.1.1"
+  }
+}
