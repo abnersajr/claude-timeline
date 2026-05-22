@@ -1,9 +1,5 @@
 # Dependencies
 node_modules/
-extractor/node_modules/
-api/node_modules/
-types/node_modules/
-web/node_modules/
 
 # Lock files (keep pnpm-lock.yaml for reproducibility)
 skills-lock.json
@@ -28,17 +24,26 @@ pnpm-debug.log*
 .idea/
 .vscode/
 *.swp
-
-# Internal agent docs
-superpowers/
 *.swo
 
 # OS
 .DS_Store
 Thumbs.db
 
-# Dex
+# Internal agent docs
+.hermes/
+.agents/
 .dex/
+superpowers/
+CLAUDE.md
+AGENTS.md
+session-report.md
+token-dashboard-analysis.md
+sketches/
+
+# Internal docs
+docs/design/
+docs/extractor-internals.md
 
 # Temporary
 *.tmp

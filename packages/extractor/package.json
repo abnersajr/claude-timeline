@@ -1,7 +1,7 @@
 {
   "name": "claude-timeline",
   "version": "1.0.0",
-  "description": "Extract and visualize Claude Code session timelines — conversations, tool calls, pricing, and tokens.",
+  "description": "Extract and visualize Claude Code session timelines \u2014 conversations, tool calls, pricing, and tokens.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -9,13 +9,25 @@
     "claude-timeline": "./dist/cli.js"
   },
   "files": [
-    "dist"
+    "dist/**/*.js",
+    "dist/**/*.d.ts",
+    "!dist/**/*.test.js",
+    "!dist/**/*.test.d.ts",
+    "!dist/**/*.js.map",
+    "!dist/**/*.d.ts.map",
+    "!dist/capture.js",
+    "!dist/db.js",
+    "!dist/server.cjs",
+    "!dist/web/"
   ],
   "repository": {
     "type": "git",
     "url": "https://github.com/abnersajr/claude-timeline"
   },
   "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
   "keywords": [
     "claude",
     "anthropic",
@@ -133,27 +145,28 @@
     "pnpm": ">=11.0.0"
   },
   "scripts": {
-    "build": "node ../scripts/build.mjs --cli",
+    "build": "tsc",
     "extract": "tsx src/index.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "lint": "@biomejs/biome check .",
-    "format": "@biomejs/biome format ."
+    "format": "@biomejs/biome format .",
+    "prepublishOnly": "tsc"
   },
   "dependencies": {
-    "better-sqlite3": "^11.7.0",
-    "chalk": "^5.6.2",
-    "commander": "^14.0.3",
-    "minimist": "^1.2.8"
+    "better-sqlite3": "11.7.0",
+    "chalk": "5.6.2",
+    "commander": "14.0.3",
+    "minimist": "1.2.8"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.4.14",
-    "@types/better-sqlite3": "^7.6.12",
-    "@types/minimist": "^1.2.5",
-    "@types/node": "^22.10.5",
-    "rolldown": "^1.0.0",
-    "tsx": "^4.19.2",
-    "typescript": "^5.7.3",
-    "vitest": "^3.1.1"
+    "@biomejs/biome": "2.4.14",
+    "@types/better-sqlite3": "7.6.12",
+    "@types/minimist": "1.2.5",
+    "@types/node": "22.10.5",
+    "rolldown": "1.0.0",
+    "tsx": "4.19.2",
+    "typescript": "5.7.3",
+    "vitest": "3.1.1"
   }
 }

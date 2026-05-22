@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="web/public/logo.svg" alt="claude-timeline" width="400" />
+  <img src="packages/web/public/logo.svg" alt="claude-timeline" width="400" />
 </p>
 
 <p align="center">

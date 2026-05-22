@@ -1,0 +1,24 @@
+# Tests
+**/*.test.js
+**/*.test.d.ts
+**/*.test.d.ts.map
+
+# Source maps
+**/*.js.map
+**/*.d.ts.map
+
+# Cost-capture scripts (bundled separately, not needed in library)
+dist/capture.js
+dist/db.js
+
+# Server bundle (not part of the library)
+dist/server.cjs
+
+# Web UI (not part of the library)
+dist/web/
+
+# Config
+src/
+tsconfig.json
+vitest.config.ts
+biome.json

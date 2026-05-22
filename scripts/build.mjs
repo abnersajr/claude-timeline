@@ -87,6 +87,13 @@ function buildCli() {
     if (existsSync(p)) rmSync(p)
   }
 
+  // Copy bundled CLI to extractor dist/ for npm publish
+  const extractorCliDest = join(EXTRACTOR, "dist", "cli.js")
+  if (existsSync(cliPath)) {
+    cpSync(cliPath, extractorCliDest)
+    log("  ✅", "Copied bundled CLI to packages/extractor/dist/cli.js")
+  }
+
   // Copy cost-capture scripts (plain JS, no bundling needed)
   log("📦", "Copying cost-capture scripts...")
   const ccDir = join(EXTRACTOR, "src", "cost-capture")

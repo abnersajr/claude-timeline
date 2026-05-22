@@ -182,7 +182,7 @@ describe("Turn", () => {
 describe("SessionMetadata", () => {
   test("can be instantiated", () => {
     const session: SessionMetadata = {
-      sessionId: "19500eaa-3cc6-4111-a82d-f158e7f76ad3",
+      sessionId: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
       projectName: "test-project",
       model: "claude-sonnet-4-6",
       workingDirectory: "/Users/test",
@@ -197,7 +197,7 @@ describe("SessionMetadata", () => {
       startTime: "2026-05-07T19:22:45.118Z",
       endTime: "2026-05-07T19:50:00.000Z",
     }
-    expect(session.sessionId).toBe("19500eaa-3cc6-4111-a82d-f158e7f76ad3")
+    expect(session.sessionId).toBe("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
     expect(session.turnCount).toBe(28)
   })
 })
