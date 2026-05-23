@@ -38,7 +38,7 @@ function getCutoff(range: RangeKey): Date | null {
 function filterByRange(sessions: SessionSummary[], range: RangeKey): SessionSummary[] {
   const cutoff = getCutoff(range)
   if (!cutoff) return sessions
-  return sessions.filter((s) => new Date(s.endTime) >= cutoff)
+  return sessions.filter((s) => new Date(s.lastTimestamp) >= cutoff)
 }
 
 function loadRange(): RangeKey {
@@ -118,7 +118,7 @@ export function SessionList() {
   const dateFiltered = filterByRange(sessions, selectedRange)
   const filteredSessions = showEmpty
     ? dateFiltered
-    : dateFiltered.filter((s) => s.totalCost > 0 || (s.apiTotalCost != null && s.apiTotalCost > 0))
+    : dateFiltered.filter((s) => s.totalCostEstimate > 0 || (s.apiTotalCost != null && s.apiTotalCost > 0))
 
   if (sessions.length === 0) {
     return (
@@ -217,8 +217,8 @@ export function SessionList() {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border bg-surface-2/50 text-left">
-              <th className="px-4 py-3 font-medium text-text-primary">Session</th>
-              <th className="px-4 py-3 font-medium text-text-primary">Model</th>
+              <th className="w-[35%] px-4 py-3 font-medium text-text-primary">Session</th>
+              <th className="whitespace-nowrap px-4 py-3 font-medium text-text-primary">Model</th>
               <th className="px-4 py-3 text-right font-medium text-text-primary">
                 Turns
               </th>

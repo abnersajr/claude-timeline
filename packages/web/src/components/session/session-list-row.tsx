@@ -1,5 +1,5 @@
 import type { SessionSummary } from "@/lib/api"
-import { formatCost, formatTokens, modelTier } from "@/lib/utils"
+import { formatCost, modelTier } from "@/lib/utils"
 import { Link } from "@tanstack/react-router"
 import { ChevronRight } from "lucide-react"
 
@@ -28,35 +28,9 @@ function formatDurationHm(ms: number): string {
   return `${minutes}m`
 }
 
-/**
- * When thinking is enabled, the JSONL estimate excludes thinking tokens
- * (billed at output rate but stripped from JSONL). Apply a conservative
- * 1.5× multiplier to the output portion of the cost as a rough estimate.
- *
- * output_cost = (outputTokens / 1M) * outputRate
- * total_cost = inputCost + outputCost + cacheReadCost + cacheCreationCost
- * adjusted = totalCost + (outputCost * 0.5)  // 1.5× on output only
- */
-function thinkingAdjustedEstimate(session: SessionSummary): number {
-  if (!session.hasThinking) return session.totalCost
-  // Rough heuristic: thinking adds ~50% to output cost
-  // Since we don't have per-turn breakdown here, apply 1.5× to full estimate
-  // (conservative — thinking cost varies per session)
-  return session.totalCost * 1.5
-}
-
 export function SessionListRow({ session, expanded, onToggleExpand }: SessionListRowProps) {
   const hasApi = session.apiTotalCost != null
-  const adjustedEstimate = thinkingAdjustedEstimate(session)
-
-  // Compute duration from start/end times
-  const durationMs = new Date(session.endTime).getTime() - new Date(session.startTime).getTime()
-  const durationFormatted = formatDurationHm(Math.max(0, durationMs))
-
-  const tokens = session.totalTokens
-
-  // When only estimate: show estimate (adjusted for thinking if detected)
-  const primaryCost = hasApi ? session.apiTotalCost! : adjustedEstimate
+  const cost = hasApi ? session.apiTotalCost! : session.totalCostEstimate
 
   return (
     <>
@@ -79,7 +53,7 @@ export function SessionListRow({ session, expanded, onToggleExpand }: SessionLis
             </div>
           </div>
         </td>
-        <td className="px-4 py-3 text-muted-foreground">
+        <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
           <code className={`rounded border px-1.5 py-0.5 text-xs model-${modelTier(session.model)}`}>
             {session.model}
           </code>
@@ -92,7 +66,7 @@ export function SessionListRow({ session, expanded, onToggleExpand }: SessionLis
             <div className="flex items-center justify-end gap-2">
               <span className="text-sm text-muted-foreground">
                 <span className="text-[0.625rem] font-medium uppercase tracking-wider opacity-60">Est </span>
-                {formatCost(session.totalCost)}
+                {formatCost(session.totalCostEstimate)}
               </span>
               <span className="text-sm font-medium text-primary">
                 <span className="text-[0.625rem] font-medium uppercase tracking-wider opacity-60">API </span>
@@ -107,7 +81,7 @@ export function SessionListRow({ session, expanded, onToggleExpand }: SessionLis
           ) : (
             <div className="flex items-center justify-end gap-1.5">
               <span className="text-sm text-muted-foreground">
-                {formatCost(primaryCost)}
+                {formatCost(cost)}
               </span>
               {session.hasThinking && (
                 <span className="inline-flex items-center rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[0.625rem] font-medium text-amber-400">
@@ -118,7 +92,7 @@ export function SessionListRow({ session, expanded, onToggleExpand }: SessionLis
           )}
         </td>
         <td className="px-4 py-3 text-muted-foreground">
-          {formatTime(session.endTime)}
+          {formatTime(session.lastTimestamp)}
         </td>
         <td className="px-4 py-3 text-right">
           <Link
@@ -135,23 +109,19 @@ export function SessionListRow({ session, expanded, onToggleExpand }: SessionLis
         <tr>
           <td colSpan={6} className="border-t border-border bg-card px-4 py-3">
             <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm md:grid-cols-3">
+              {session.activeDurationMs != null && (
+                <div>
+                  <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Duration</span>
+                  <p className="mt-0.5 font-medium text-foreground">{formatDurationHm(session.activeDurationMs)}</p>
+                </div>
+              )}
               <div>
-                <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Duration</span>
-                <p className="mt-0.5 font-medium text-foreground">{durationFormatted}</p>
-              </div>
-              <div>
-                <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Tokens</span>
-                <p className="mt-0.5 font-medium text-foreground">
-                  <span title="Input">{formatTokens(tokens.inputTokens)} in</span>
-                  {' / '}
-                  <span title="Output">{formatTokens(tokens.outputTokens)} out</span>
-                  {' / '}
-                  <span title="Cache read">{formatTokens(tokens.cacheReadTokens)} cache</span>
-                </p>
+                <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Turns</span>
+                <p className="mt-0.5 font-medium text-foreground">{session.turnCount}</p>
               </div>
               <div>
                 <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Cost</span>
-                <p className="mt-0.5 font-medium text-foreground">{formatCost(primaryCost)}</p>
+                <p className="mt-0.5 font-medium text-foreground">{formatCost(cost)}</p>
               </div>
               <div>
                 <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Model</span>
@@ -162,9 +132,9 @@ export function SessionListRow({ session, expanded, onToggleExpand }: SessionLis
                 </p>
               </div>
               <div>
-                <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Working Directory</span>
-                <p className="mt-0.5 truncate font-medium text-foreground" title={session.workingDirectory}>
-                  {session.workingDirectory}
+                <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Project</span>
+                <p className="mt-0.5 truncate font-medium text-foreground" title={session.projectName}>
+                  {session.projectName}
                 </p>
               </div>
             </div>

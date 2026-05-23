@@ -245,7 +245,7 @@ function TurnRow({ turn, index, pricing, isFinalOutput }: { turn: Turn; index: n
 
       {/* Inline text preview (below the row) — skip for final output (shown as bubble) */}
       {text && !isFinalOutput && (
-        <div className="mt-1 ml-6 text-sm text-foreground/70 break-words">
+        <div className="mt-1 ml-6 text-sm text-foreground/70 break-words blur-sensitive">
           <span className="inline-block rounded bg-muted px-1 py-0.5 text-[10px] font-semibold text-muted-foreground mr-1.5 align-middle">text</span>
           <span className="align-middle">{text}</span>
         </div>
@@ -413,7 +413,7 @@ function AgentOutputBubble({ text, turn: _turn }: { text: string; turn: Turn }) 
     <div className="flex flex-col items-end">
       <div className="relative">
         <div className="absolute -top-1.5 right-3 h-3 w-3 rotate-45 border-r border-t border-emerald-500/30 bg-emerald-500/5" />
-        <div className="relative max-w-full rounded-2xl rounded-tr-md border border-emerald-500/20 bg-emerald-500/5 px-4 py-2.5 max-sm:max-w-full">
+        <div className="relative max-w-full rounded-2xl rounded-tr-md border border-emerald-500/20 bg-emerald-500/5 px-4 py-2.5 blur-sensitive max-sm:max-w-full">
           <div className="prose prose-sm prose-invert max-w-none font-mono text-[0.9375rem] text-foreground/90 break-words [&_strong]:text-foreground [&_code]:text-emerald-400 [&_code]:bg-emerald-500/10 [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded [&_pre]:bg-muted/50 [&_pre]:p-2 [&_pre]:rounded-md [&_pre]:overflow-x-auto [&_ul]:my-1 [&_li]:my-0.5">
             <Markdown>{text}</Markdown>
           </div>
@@ -546,7 +546,7 @@ function InteractionGroup({
               <span>{formatTimestamp(firstTurn!.timestamp)}</span>
             </div>
             <div className={cn(
-              "max-w-[70%] rounded-2xl rounded-tl-md border px-4 py-2.5 font-mono text-[0.9375rem] max-sm:max-w-full",
+              "max-w-[70%] rounded-2xl rounded-tl-md border px-4 py-2.5 font-mono text-[0.9375rem] blur-sensitive max-sm:max-w-full",
               userText.startsWith("/") ? "border-primary/30 bg-primary/15 text-primary-foreground" : "border-primary/20 bg-primary/10 text-foreground",
             )}>
               <p className="whitespace-pre-wrap break-words">{userText}</p>

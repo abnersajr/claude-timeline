@@ -93,7 +93,7 @@ function MessagePreview({
           >
             <div
               className={cn(
-              "w-fit max-w-[60%] rounded-lg px-3 py-2 text-xs",
+              "w-fit max-w-[60%] rounded-lg px-3 py-2 text-xs blur-sensitive",
               isUser && "bg-blue-500/10",
               isAssistant && "bg-emerald-500/10",
               isSystem && "bg-muted max-w-full w-auto",
