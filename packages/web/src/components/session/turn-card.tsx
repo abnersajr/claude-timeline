@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import type { Turn, TurnPricing } from "claude-timeline-types"
-import { cn, formatCost, formatTimestamp } from "@/lib/utils"
+import { cn, formatCost, formatTimestamp, modelTier } from "@/lib/utils"
 import { TokenBadgeGroup } from "./token-badge"
 import { ToolCallList, ToolCallPills } from "./tool-call"
 
@@ -168,7 +168,7 @@ export function TurnCard({ turn, pricing, index, className }: TurnCardProps) {
               Turn {index + 1}
             </span>
             {turn.model && (
-              <span className="rounded bg-muted px-1.5 py-0.5 text-[0.625rem] text-muted-foreground">
+              <span className={`rounded border px-1.5 py-0.5 text-[0.625rem] font-mono model-${modelTier(turn.model)}`}>
                 {turn.model}
               </span>
             )}

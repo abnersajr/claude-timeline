@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import type { Subagent, ToolCall } from "claude-timeline-types"
-import { cn, formatTokens, formatDuration, formatCost } from "@/lib/utils"
+import { cn, formatTokens, formatDuration, formatCost, modelTier } from "@/lib/utils"
 import { ToolCallList } from "./tool-call"
 
 // ---------------------------------------------------------------------------
@@ -168,7 +168,7 @@ function SubagentCard({ subagent, isLast: _isLast }: SubagentCardProps) {
 
         {/* Model */}
         {subagent.model && (
-          <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-xs font-mono text-muted-foreground">
+          <span className={`shrink-0 rounded border px-1.5 py-0.5 text-xs font-mono model-${modelTier(subagent.model)}`}>
             {subagent.model}
           </span>
         )}

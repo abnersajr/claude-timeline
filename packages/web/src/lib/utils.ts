@@ -37,3 +37,13 @@ export function formatDate(ts: string): string {
     minute: "2-digit",
   })
 }
+
+export type ModelTier = "opus" | "sonnet" | "haiku" | "unknown"
+
+export function modelTier(model: string): ModelTier {
+  const m = (model || '').toLowerCase()
+  if (m.includes('opus')) return 'opus'
+  if (m.includes('sonnet')) return 'sonnet'
+  if (m.includes('haiku')) return 'haiku'
+  return 'unknown'
+}

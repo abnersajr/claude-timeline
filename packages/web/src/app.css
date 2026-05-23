@@ -145,3 +145,24 @@
 .step-flash {
   animation: step-flash 2s ease-out forwards;
 }
+
+/* Model tier color coding badges */
+.model-opus {
+  background-color: rgba(124, 92, 255, 0.15);
+  color: #a78bfa;
+  border-color: rgba(124, 92, 255, 0.3);
+}
+.model-sonnet {
+  background-color: rgba(74, 158, 255, 0.15);
+  color: #60a5fa;
+  border-color: rgba(74, 158, 255, 0.3);
+}
+.model-haiku {
+  background-color: rgba(63, 182, 139, 0.15);
+  color: #34d399;
+  border-color: rgba(63, 182, 139, 0.3);
+}
+
+/* Privacy blur toggle */
+.blur-sensitive { transition: filter 120ms ease; }
+body.privacy-on .blur-sensitive { filter: blur(6px); user-select: none; }

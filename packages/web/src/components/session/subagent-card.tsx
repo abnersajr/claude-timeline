@@ -1,5 +1,5 @@
 import * as React from "react";
-import { cn } from "../../lib/utils";
+import { cn, modelTier } from "../../lib/utils";
 import { formatTokens, formatDuration } from "../../lib/utils";
 
 // ---------------------------------------------------------------------------
@@ -118,7 +118,7 @@ export function SubagentCard({
             <Stat label="Turns" value={subagent.turns.toString()} />
             <Stat label="Tokens" value={formatTokens(subagent.tokens)} />
             <Stat label="Duration" value={formatDuration(subagent.durationMs)} />
-            {subagent.model && <Stat label="Model" value={subagent.model} />}
+            {subagent.model && <Stat label="Model" value={subagent.model} className={`model-${modelTier(subagent.model)} px-1.5 py-0.5 rounded border`} />}
           </div>
 
           {subagent.error && (
@@ -136,11 +136,11 @@ export function SubagentCard({
 // Stat — small key/value pair inside expanded card
 // ---------------------------------------------------------------------------
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({ label, value, className }: { label: string; value: string; className?: string }) {
   return (
     <div>
       <dt className="text-xs text-muted-foreground">{label}</dt>
-      <dd className="text-sm font-medium">{value}</dd>
+      <dd className={cn("text-sm font-medium", className)}>{value}</dd>
     </div>
   );
 }

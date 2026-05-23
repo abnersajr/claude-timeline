@@ -126,7 +126,7 @@ export function ToolCallItem({ toolCall, className }: ToolCallItemProps) {
             <span className="mb-1 block text-sm font-medium uppercase tracking-wider text-muted-foreground">
               Input
             </span>
-            <pre className="max-h-48 overflow-auto rounded-md bg-accent p-2.5 font-mono text-xs text-muted-foreground whitespace-pre-wrap break-all">
+            <pre className="blur-sensitive max-h-48 overflow-auto rounded-md bg-accent p-2.5 font-mono text-xs text-muted-foreground whitespace-pre-wrap break-all">
               {JSON.stringify(toolCall.input, null, 2)}
             </pre>
           </div>

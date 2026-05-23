@@ -4,7 +4,7 @@ import type {
   TurnPricing,
   SessionPricing,
 } from "claude-timeline-types"
-import { cn, formatCost, formatTokens } from "@/lib/utils"
+import { cn, formatCost, formatTokens, modelTier } from "@/lib/utils"
 import { buildSessionSteps } from "@/lib/steps"
 
 // ---------------------------------------------------------------------------
@@ -153,7 +153,7 @@ function ModelTab({ model, cost, totalCost, isActive, isMain, onClick }: ModelTa
       )}
       onClick={onClick}
     >
-      <span className="capitalize">{shortModel}</span>
+      <span className={`capitalize model-${modelTier(model)}`}>{shortModel}</span>
       {isMain && (
         <span className="text-[0.625rem] text-text-muted">(main)</span>
       )}
@@ -386,7 +386,7 @@ export function CostBreakdown({ pricing, turns, className }: CostBreakdownProps)
                   const isMain = model === normalizeModelName(pricingRate.model)
                   return (
                     <div key={model} className="flex items-center justify-between text-sm">
-                      <span className="text-text-secondary">
+                      <span className={`text-text-secondary model-${modelTier(model)} px-1.5 py-0.5 rounded border`}>
                         {model}
                         {isMain && <span className="text-[0.625rem] text-text-muted ml-1">(main)</span>}
                         {!isMain && <span className="text-[0.625rem] text-text-muted ml-1">({data.turnCount} turns)</span>}

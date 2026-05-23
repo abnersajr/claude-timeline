@@ -55,7 +55,7 @@ export function CollapsibleResult({
         )}
       </button>
       {open && (
-        <pre className="max-h-[500px] resize-y overflow-auto rounded-md bg-accent p-2.5 font-mono text-xs text-muted-foreground whitespace-pre-wrap break-all">
+        <pre className="blur-sensitive max-h-[500px] resize-y overflow-auto rounded-md bg-accent p-2.5 font-mono text-xs text-muted-foreground whitespace-pre-wrap break-all">
           {content}
         </pre>
       )}

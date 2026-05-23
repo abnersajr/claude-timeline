@@ -4,9 +4,22 @@ export interface SessionSummary {
   sessionId: string
   projectName: string
   model: string
+  workingDirectory: string
   turnCount: number
-  lastTimestamp: string
-  totalCostEstimate: number
+  totalTokens: {
+    inputTokens: number
+    outputTokens: number
+    cacheReadTokens: number
+    cacheCreation5mTokens: number
+    cacheCreation1hTokens: number
+    cacheCreationTokens?: number
+  }
+  startTime: string
+  endTime: string
+  isOngoing: boolean
+  totalCost: number
+  costCaptureAvailable?: boolean
+  estimatedTotalCost?: number
   apiTotalCost?: number | null
   hasThinking?: boolean
 }
