@@ -509,4 +509,45 @@ program
     await runSetup()
   })
 
+// update-pricing subcommand
+program
+  .command("update-pricing")
+  .description("Fetch latest model pricing from Anthropic and save to ~/.claude-timeline/pricing.json")
+  .action(async () => {
+    const { scrapePricing } = await import("./pricing-scraper.js")
+    const { mkdirSync, writeFileSync, existsSync } = await import("node:fs")
+
+    console.log("")
+    console.log("  Fetching pricing from Anthropic...")
+    console.log("")
+
+    try {
+      const table = await scrapePricing()
+      const pricingDir = TIMELINE_DIR
+      if (!existsSync(pricingDir)) mkdirSync(pricingDir, { recursive: true })
+
+      const pricingPath = path.join(pricingDir, "pricing.json")
+      writeFileSync(pricingPath, JSON.stringify(table, null, 2) + "\n", "utf-8")
+
+      const modelCount = Object.keys(table).length
+      console.log(`  ✓ Saved ${modelCount} model${modelCount !== 1 ? "s" : ""} to ${pricingPath}`)
+      console.log("")
+
+      // Print summary table
+      console.log("  ┌─ Models ────────────────────────────────────────────────────────┐")
+      for (const rate of Object.values(table)) {
+        const name = rate.model.padEnd(20)
+        const inp = `$${rate.inputPerMTok.toFixed(2)}`.padStart(6)
+        const out = `$${rate.outputPerMTok.toFixed(2)}`.padStart(6)
+        console.log(`  │  ${name} input ${inp}  output ${out} │`)
+      }
+      console.log("  └────────────────────────────────────────────────────────────────┘")
+      console.log("")
+    } catch (err: unknown) {
+      console.error(`  ✗ Failed: ${(err as Error).message}`)
+      console.error("")
+      process.exit(1)
+    }
+  })
+
 program.parse()

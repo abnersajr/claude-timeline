@@ -24,4 +24,4 @@ export type {
   ContextInjection,
   TurnContextSnapshot,
   ContextStats,
-} from "claude-timeline/types"
+} from "claude-timeline-extractor/types"

@@ -16,7 +16,7 @@
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
-    "claude-timeline": "workspace:*",
+    "claude-timeline-extractor": "workspace:*",
     "@types/node": "22.10.5",
     "typescript": "5.7.3"
   }

@@ -1,8 +1,20 @@
+import { existsSync, readFileSync } from "node:fs"
+import { join } from "node:path"
+import { homedir } from "node:os"
 import { normalizeModelName } from "./model-parser.js"
 import type { PricingRate, SessionMetadata, SessionPricing, Turn, TurnPricing } from "./types.js"
 
-const PRICING_TABLE: Record<string, PricingRate> = {
+// ── Fallback table (compiled in) ────────────────────────────────────────
+const FALLBACK_TABLE: Record<string, PricingRate> = {
   // ── Latest models ──────────────────────────────────────────────
+  "claude-opus-4-8": {
+    model: "claude-opus-4-8",
+    inputPerMTok: 5.0,
+    outputPerMTok: 25.0,
+    cacheReadPerMTok: 0.5,
+    cacheCreation5mPerMTok: 6.25,
+    cacheCreation1hPerMTok: 10.0,
+  },
   "claude-opus-4-7": {
     model: "claude-opus-4-7",
     inputPerMTok: 5.0,
@@ -101,6 +113,30 @@ const PRICING_TABLE: Record<string, PricingRate> = {
     cacheCreation5mPerMTok: 0.3,
     cacheCreation1hPerMTok: 0.5,
   },
+}
+
+// ── Dynamic pricing (from ~/.claude-timeline/pricing.json) ──────────────
+function loadPricingTable(): Record<string, PricingRate> {
+  try {
+    const pricingPath = join(homedir(), ".claude-timeline", "pricing.json")
+    if (existsSync(pricingPath)) {
+      const raw = readFileSync(pricingPath, "utf-8")
+      const data = JSON.parse(raw) as Record<string, PricingRate>
+      // Validate it has at least one entry
+      if (Object.keys(data).length > 0) return data
+    }
+  } catch {
+    // Fall through to hardcoded
+  }
+  return FALLBACK_TABLE
+}
+
+/** Pricing table — loaded once at module init. Call `updatePricingTable()` to refresh. */
+let PRICING_TABLE = loadPricingTable()
+
+/** Reload pricing from disk (used after `update-pricing` writes a new file). */
+export function updatePricingTable(): void {
+  PRICING_TABLE = loadPricingTable()
 }
 
 /**

@@ -17,7 +17,7 @@
     "fixtures:seed": "tsx tests/fixtures/seed.ts"
   },
   "dependencies": {
-    "claude-timeline": "workspace:*",
+    "claude-timeline-extractor": "workspace:*",
     "claude-timeline-types": "workspace:*",
     "cors": "2.8.5",
     "express": "5.1.0",

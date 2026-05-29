@@ -1,13 +1,10 @@
 {
-  "name": "claude-timeline",
+  "name": "claude-timeline-extractor",
   "version": "1.0.0",
   "description": "Extract and visualize Claude Code session timelines \u2014 conversations, tool calls, pricing, and tokens.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "bin": {
-    "claude-timeline": "./dist/cli.js"
-  },
   "files": [
     "dist/**/*.js",
     "dist/**/*.d.ts",
@@ -15,6 +12,7 @@
     "!dist/**/*.test.d.ts",
     "!dist/**/*.js.map",
     "!dist/**/*.d.ts.map",
+    "!dist/cli.js",
     "!dist/capture.js",
     "!dist/db.js",
     "!dist/server.cjs",
@@ -73,6 +71,11 @@
       "types": "./dist/pricing.d.ts",
       "import": "./dist/pricing.js",
       "default": "./dist/pricing.js"
+    },
+    "./pricing-scraper": {
+      "types": "./dist/pricing-scraper.d.ts",
+      "import": "./dist/pricing-scraper.js",
+      "default": "./dist/pricing-scraper.js"
     },
     "./context-tracker": {
       "types": "./dist/context-tracker.d.ts",

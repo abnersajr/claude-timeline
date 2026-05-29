@@ -1,7 +1,7 @@
 {
   "name": "claude-timeline",
   "version": "1.0.0",
-  "description": "Claude Code session timeline \u2014 extract, visualize, and track costs from your Claude Code sessions",
+  "description": "Claude Code session timeline — extract, visualize, and track costs from your Claude Code sessions",
   "type": "module",
   "packageManager": "pnpm@11.0.3",
   "main": "./dist/cli.js",
@@ -16,6 +16,9 @@
     "url": "https://github.com/abnersajr/claude-timeline"
   },
   "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
   "keywords": [
     "claude",
     "anthropic",
@@ -35,7 +38,11 @@
     "build:server": "node scripts/build.mjs --server",
     "build:web": "node scripts/build.mjs --web",
     "dev": "node scripts/dev.mjs",
-    "dev:api": "turbo dev --filter=claude-timeline-api"
+    "dev:api": "turbo dev --filter=claude-timeline-api",
+    "prepack": "node scripts/build.mjs",
+    "changeset": "changeset",
+    "version-packages": "changeset version",
+    "release": "changeset publish"
   },
   "dependencies": {
     "better-sqlite3": "11.7.0",
@@ -48,6 +55,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.14",
+    "@changesets/cli": "^2.31.0",
     "@types/better-sqlite3": "7.6.12",
     "@types/cors": "2.8.17",
     "@types/express": "5.0.6",

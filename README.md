@@ -11,7 +11,12 @@
   <a href="https://github.com/abnersajr/claude-timeline/actions"><img src="https://github.com/abnersajr/claude-timeline/workflows/CI/badge.svg" alt="CI" /></a>
   <a href="https://www.npmjs.com/package/claude-timeline"><img src="https://img.shields.io/npm/v/claude-timeline" alt="npm version" /></a>
   <a href="https://github.com/abnersajr/claude-timeline/blob/main/LICENSE"><img src="https://img.shields.io/npm/l/claude-timeline" alt="license" /></a>
+  <a href="https://ko-fi.com/abnersajr"><img src="https://img.shields.io/badge/Ko--fi-Support%20the%20project-ff5e5b?logo=ko-fi&logoColor=white" alt="Ko-fi" /></a>
 </p>
+
+> **👋 About me:** I'm Abner — a dev from Brazil 🇧🇷 now living in Montreal 🍁. This project started because I was frustrated with existing tools and decided to vibe-code my own. It grew into something real, and now I'm sharing it with the community.
+>
+> **☕ Donations** will support continued development of this project, and a portion will be donated to an NGO that takes care of animals 🐾. If this tool saved you time, consider fueling the next feature!
 
 ---
 
@@ -169,8 +174,10 @@ claude-timeline <command> [options]
 
 Commands:
   serve [--port <port>]    Start web UI + API server (default: 5199)
-  --session-id <id>        Extract a specific session to JSON
-  --list-sessions          List all available sessions
+  extract --session-id <id> Extract a specific session to JSON
+  list                     List all available sessions
+  setup                    Install cost-capture statusline wrapper
+  update-pricing           Fetch latest model pricing from Anthropic
   --help                   Show help
 
 Options:
@@ -191,6 +198,7 @@ claude-timeline/
 │   │   ├── jsonl-parser.ts   # JSONL session file parser
 │   │   ├── merger.ts         # Merge SQLite + JSONL data
 │   │   ├── pricing.ts        # Model pricing lookup
+│   │   ├── pricing-scraper.ts # Fetch pricing from Anthropic docs
 │   │   ├── classifier.ts     # Message classification
 │   │   ├── tool-extraction.ts # Tool call extraction
 │   │   ├── subagent-*.ts     # Subagent detection + resolution

@@ -22,11 +22,11 @@ describe("getPricing", () => {
   test("returns correct rates for claude-opus-4", () => {
     const rate = getPricing("claude-opus-4")
     expect(rate.model).toBe("claude-opus-4")
-    expect(rate.inputPerMTok).toBe(5.0)
-    expect(rate.outputPerMTok).toBe(25.0)
-    expect(rate.cacheReadPerMTok).toBe(0.5)
-    expect(rate.cacheCreation5mPerMTok).toBe(6.25)
-    expect(rate.cacheCreation1hPerMTok).toBe(10.0)
+    expect(rate.inputPerMTok).toBe(15.0)
+    expect(rate.outputPerMTok).toBe(75.0)
+    expect(rate.cacheReadPerMTok).toBe(1.5)
+    expect(rate.cacheCreation5mPerMTok).toBe(18.75)
+    expect(rate.cacheCreation1hPerMTok).toBe(30.0)
   })
 
   test("falls back to sonnet-4-6 rates for unknown model", () => {
