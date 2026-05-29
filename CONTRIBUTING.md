@@ -4,7 +4,7 @@ Thanks for your interest in contributing! Here's how to get started.
 
 ## Prerequisites
 
-- Node.js ≥ 18
+- Node.js ≥ 22
 - pnpm ≥ 11
 
 ## Development Setup
