@@ -75,11 +75,11 @@ npx claude-timeline --session-id <session-id>
 ### Library
 
 ```bash
-npm install claude-timeline
+npm install claude-timeline-extractor
 ```
 
 ```typescript
-import { extractFullTimeline } from "claude-timeline";
+import { extractFullTimeline } from "claude-timeline-extractor";
 
 const session = await extractFullTimeline(
   sessionId,
@@ -224,12 +224,12 @@ The package exports individual modules for tree-shaking:
 
 ```typescript
 // Main entry
-import { extractFullTimeline } from "claude-timeline";
+import { extractFullTimeline } from "claude-timeline-extractor";
 
 // Individual modules
-import { parseJsonlFile } from "claude-timeline/jsonl-parser";
-import { readUsageDb } from "claude-timeline/db-reader";
-import { calculatePricing } from "claude-timeline/pricing";
+import { parseJsonlFile } from "claude-timeline-extractor/jsonl-parser";
+import { readUsageDb } from "claude-timeline-extractor/db-reader";
+import { calculatePricing } from "claude-timeline-extractor/pricing";
 ```
 
 ## Troubleshooting
