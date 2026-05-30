@@ -187,6 +187,63 @@ Options:
   --output <path>          Write JSON to file instead of stdout
 ```
 
+## Cost Capture Setup
+
+One of claude-timeline's key differentiators is **API-level cost estimation** — real-time, per-turn tracking of tokens, cache usage, and dollar cost pulled directly from Claude Code's statusline payload. This gives you accurate spending visibility that the built-in usage display doesn't provide.
+
+### Quick Start
+
+```bash
+npx claude-timeline setup
+```
+
+This hooks into Claude Code's statusline and starts capturing cost data automatically.
+
+### What It Does
+
+Claude Code calls a `statusLine` command after every turn, passing JSON with token usage, model info, and cost data. The setup command installs a wrapper that:
+
+1. **Intercepts** the JSON payload from every turn
+2. **Extracts** cost, token, model, duration, and context window data
+3. **Writes** snapshots to a local SQLite database (`~/.claude-timeline/cost-stream.db`)
+4. **Delegates** to your original statusline command (if you had one) — nothing breaks
+
+### What Gets Captured
+
+| Field | Description |
+|-------|-------------|
+| `total_cost_usd` | Running session cost |
+| `input_tokens` | New (non-cached) input tokens |
+| `output_tokens` | Model-generated tokens |
+| `cache_read_tokens` | Cached context read per turn |
+| `cache_creation_tokens` | One-time cache write cost |
+| `model` | Active model name |
+| `duration_ms` | Total session duration |
+| `lines_added` / `lines_removed` | Code churn |
+
+### How It Works
+
+```
+Claude Code turn completes
+  → calls statusLine command with JSON on stdin
+    → capture.js intercepts, writes to cost-stream.db
+      → runs your original statusLine (if any)
+        → stdout returned to Claude Code as usual
+```
+
+The data feeds directly into `npx claude-timeline serve` for live cost streaming in the web UI.
+
+### Uninstall
+
+```bash
+# Remove the wrapper from Claude Code settings
+# Edit ~/.claude/settings.json and remove the statusLine key
+# Then delete the cost-capture files
+rm -rf ~/.claude-timeline/
+```
+
+If you had a custom `statusLine` before setup, the original command is preserved in `~/.claude-timeline/config.json` under `originalStatusLine`.
+
 ## Architecture
 
 ```

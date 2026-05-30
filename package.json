@@ -40,6 +40,7 @@
     "dev": "node scripts/dev.mjs",
     "dev:api": "turbo dev --filter=claude-timeline-api",
     "prepack": "node scripts/build.mjs",
+    "typecheck": "turbo run typecheck",
     "changeset": "changeset",
     "version-packages": "changeset version",
     "release": "changeset publish"

@@ -5,8 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "generate": "tsr generate",
+    "build": "tsr generate && tsc -b && vite build",
     "preview": "vite preview",
+    "typecheck": "tsr generate && tsc -b",
     "lint": "biome check .",
     "format": "biome format .",
     "test": "vitest run"
@@ -18,8 +20,8 @@
     "@tanstack/react-query": "5.75.0",
     "@tanstack/react-router": "1.169.2",
     "@tanstack/router-devtools": "1.166.13",
-    "claude-timeline-types": "workspace:*",
     "class-variance-authority": "0.7.1",
+    "claude-timeline-types": "workspace:*",
     "clsx": "2.1.1",
     "lucide-react": "0.500.0",
     "react": "19.2.5",
@@ -33,6 +35,7 @@
   "devDependencies": {
     "@biomejs/biome": "2.4.15",
     "@tailwindcss/vite": "4.3.0",
+    "@tanstack/router-cli": "^1.167.11",
     "@tanstack/router-plugin": "1.167.35",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",

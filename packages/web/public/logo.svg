@@ -16,5 +16,5 @@
   <!-- Project name -->
   <text x="166" y="34"
         font-family="ui-monospace, 'SF Mono', 'Cascadia Code', 'Fira Code', 'JetBrains Mono', Consolas, 'Liberation Mono', Menlo, monospace"
-        font-size="22" font-weight="600" fill="#D1D5DB" letter-spacing="-0.5">claude<tspan fill="#D97706">-</tspan>timeline</text>
+        font-size="22" font-weight="600" fill="#374151" letter-spacing="-0.5">claude<tspan fill="#D97706">-</tspan>timeline</text>
 </svg>
