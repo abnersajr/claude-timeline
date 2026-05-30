@@ -148,6 +148,7 @@ async function buildServer() {
 function buildWeb() {
   log("🎨", "Building web UI...")
 
+  run("tsr generate", WEB)
   run("tsc -b", WEB)
   run("vite build", WEB)
 
