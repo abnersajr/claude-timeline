@@ -64,7 +64,9 @@ export function CostSettings() {
             "flex items-center gap-2 text-sm",
             status.costCapture.installed
               ? "text-emerald-400"
-              : "text-muted-foreground"
+              : status.costCapture.dbExists
+                ? "text-amber-400"
+                : "text-muted-foreground"
           )}
         >
           <span
@@ -72,10 +74,16 @@ export function CostSettings() {
               "inline-block h-2 w-2 rounded-full",
               status.costCapture.installed
                 ? "bg-emerald-500"
-                : "bg-muted-foreground/40"
+                : status.costCapture.dbExists
+                  ? "bg-amber-500"
+                  : "bg-muted-foreground/40"
             )}
           />
-          {status.costCapture.installed ? "Active" : "Not installed"}
+          {status.costCapture.installed
+            ? "Active"
+            : status.costCapture.dbExists
+              ? "DB exists but statusline not active"
+              : "Not installed"}
         </div>
         {status.costCapture.installed && (
           <div className="mt-2 space-y-1 text-xs text-muted-foreground">
@@ -83,9 +91,18 @@ export function CostSettings() {
             <p>{status.costCapture.sessionCount} sessions with cost data</p>
           </div>
         )}
-        {!status.costCapture.installed && (
+        {!status.costCapture.installed && status.costCapture.dbExists && (
+          <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+            <p>DB: {status.costCapture.dbPath}</p>
+            <p>{status.costCapture.sessionCount} sessions with cost data (historical)</p>
+            <p>
+              Run <code className="rounded bg-accent px-1">claude-timeline setup</code> to re-enable capture
+            </p>
+          </div>
+        )}
+        {!status.costCapture.installed && !status.costCapture.dbExists && (
           <p className="mt-2 text-xs text-muted-foreground">
-            Run <code className="rounded bg-accent px-1">claude-dash setup</code> to enable
+            Run <code className="rounded bg-accent px-1">claude-timeline setup</code> to enable
           </p>
         )}
       </section>

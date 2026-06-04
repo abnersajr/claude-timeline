@@ -6,10 +6,30 @@ import { homedir } from "node:os"
 import type { Config } from "../config.js"
 
 const DASH_CONFIG_PATH = join(homedir(), ".claude-dash", "config.json")
+const CLAUDE_SETTINGS_PATH = join(homedir(), ".claude", "settings.json")
+const TIMELINE_DIR = join(homedir(), ".claude-timeline")
 
 const settingsSchema = z.object({
   costMethod: z.enum(["api", "estimated", "auto"]),
 })
+
+/**
+ * Check if the cost-capture statusline is actually installed in Claude Code.
+ * Requires: (1) capture.js exists in ~/.claude-timeline/, (2) settings.json
+ * statusLine.command points to it.
+ */
+function isStatuslineInstalled(): boolean {
+  const capturePath = join(TIMELINE_DIR, "capture.js")
+  if (!existsSync(capturePath)) return false
+
+  try {
+    const settings = JSON.parse(readFileSync(CLAUDE_SETTINGS_PATH, "utf-8"))
+    const cmd = settings.statusLine?.command as string | undefined
+    return typeof cmd === "string" && cmd.includes("capture.js")
+  } catch {
+    return false
+  }
+}
 
 export function createStatusRouter(config: Config): Router {
   const router = Router()
@@ -17,6 +37,7 @@ export function createStatusRouter(config: Config): Router {
   // GET /api/status — cost capture status + global settings
   router.get("/status", async (_req, res) => {
     const dbExists = existsSync(config.costStreamDbPath)
+    const statuslineActive = isStatuslineInstalled()
     let sessionCount = 0
 
     if (dbExists) {
@@ -35,7 +56,8 @@ export function createStatusRouter(config: Config): Router {
 
     res.json({
       costCapture: {
-        installed: dbExists,
+        installed: statuslineActive,
+        dbExists,
         dbPath: config.costStreamDbPath,
         sessionCount,
       },

@@ -15,6 +15,7 @@ export interface SessionSummary {
 export interface CostStatus {
   costCapture: {
     installed: boolean
+    dbExists: boolean
     dbPath: string
     sessionCount: number
   }
