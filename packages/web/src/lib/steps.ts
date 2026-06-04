@@ -14,8 +14,7 @@ export interface Step {
   inputCost: number
   outputCost: number
   cacheReadCost: number
-  cacheCreation5mCost: number
-  cacheCreation1hCost: number
+  cacheWriteCost: number
 }
 
 export type StepTurnKind = "user" | "billed" | "tool"
@@ -31,7 +30,7 @@ export function totalTokens(turn: Turn): number {
     u.outputTokens +
     u.cacheReadTokens +
     u.cacheCreation5mTokens +
-    u.cacheCreation1hTokens
+    u.cacheCreation1hTokens  // still separate in TokenUsage (raw API fields)
   )
 }
 
@@ -78,8 +77,7 @@ function accumulatePricing(step: Step, pricing: TurnPricing | undefined): void {
   step.inputCost += pricing.inputCost
   step.outputCost += pricing.outputCost
   step.cacheReadCost += pricing.cacheReadCost
-  step.cacheCreation5mCost += pricing.cacheCreation5mCost
-  step.cacheCreation1hCost += pricing.cacheCreation1hCost
+  step.cacheWriteCost += pricing.cacheWriteCost
 }
 
 function newStep(anchor: Turn): Step {
@@ -92,8 +90,7 @@ function newStep(anchor: Turn): Step {
     inputCost: 0,
     outputCost: 0,
     cacheReadCost: 0,
-    cacheCreation5mCost: 0,
-    cacheCreation1hCost: 0,
+    cacheWriteCost: 0,
   }
 }
 
@@ -106,8 +103,7 @@ export interface StepAggregate {
   inputTokens: number
   outputTokens: number
   cacheReadTokens: number
-  cacheCreation5mTokens: number
-  cacheCreation1hTokens: number
+  cacheWriteTokens: number
   totalTokens: number
   totalCost: number
   cumulativeCost: number
@@ -143,23 +139,20 @@ export function buildSessionSteps(
     let inputTokens = 0
     let outputTokens = 0
     let cacheReadTokens = 0
-    let cacheCreation5mTokens = 0
-    let cacheCreation1hTokens = 0
+    let cacheWriteTokens = 0
 
     for (const turn of allTurns) {
       inputTokens += turn.tokenUsage.inputTokens
       outputTokens += turn.tokenUsage.outputTokens
       cacheReadTokens += turn.tokenUsage.cacheReadTokens
-      cacheCreation5mTokens += turn.tokenUsage.cacheCreation5mTokens
-      cacheCreation1hTokens += turn.tokenUsage.cacheCreation1hTokens
+      cacheWriteTokens += turn.tokenUsage.cacheCreation5mTokens + turn.tokenUsage.cacheCreation1hTokens
     }
 
     const totalTokens =
       inputTokens +
       outputTokens +
       cacheReadTokens +
-      cacheCreation5mTokens +
-      cacheCreation1hTokens
+      cacheWriteTokens
     cumulativeCost += step.totalCost
 
     return {
@@ -167,8 +160,7 @@ export function buildSessionSteps(
       inputTokens,
       outputTokens,
       cacheReadTokens,
-      cacheCreation5mTokens,
-      cacheCreation1hTokens,
+      cacheWriteTokens,
       totalTokens,
       totalCost: step.totalCost,
       cumulativeCost,

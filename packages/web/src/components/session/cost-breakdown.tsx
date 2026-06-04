@@ -46,14 +46,13 @@ interface ModelTabProps {
 // Constants
 // ---------------------------------------------------------------------------
 
-type CostKey = "inputCost" | "outputCost" | "cacheReadCost" | "cacheCreation5mCost" | "cacheCreation1hCost"
+type CostKey = "inputCost" | "outputCost" | "cacheReadCost" | "cacheWriteCost"
 
 const COST_CATEGORIES: { key: CostKey; label: string; color: string }[] = [
   { key: "inputCost", label: "Input", color: "bg-blue-500" },
   { key: "outputCost", label: "Output", color: "bg-emerald-500" },
   { key: "cacheReadCost", label: "Cache Read", color: "bg-amber-500" },
-  { key: "cacheCreation5mCost", label: "Cache Write (5m)", color: "bg-violet-500" },
-  { key: "cacheCreation1hCost", label: "Cache Write (1h)", color: "bg-pink-500" },
+  { key: "cacheWriteCost", label: "Cache Write", color: "bg-violet-500" },
 ]
 
 // ---------------------------------------------------------------------------
@@ -77,21 +76,21 @@ function aggregateCosts(turnsPricing: TurnPricing[]): Record<string, number> {
   return agg
 }
 
-function getPricingRateForModel(model: string): { input: number; output: number; cacheRead: number; cacheWrite5m: number; cacheWrite1h: number } {
+function getPricingRateForModel(model: string): { input: number; output: number; cacheRead: number; cacheWrite: number } {
   // Map normalized model names to pricing rates
-  const rates: Record<string, { input: number; output: number; cacheRead: number; cacheWrite5m: number; cacheWrite1h: number }> = {
-    "claude-sonnet-4-6": { input: 3.0, output: 15.0, cacheRead: 0.3, cacheWrite5m: 3.75, cacheWrite1h: 6.0 },
-    "claude-sonnet-4-5": { input: 3.0, output: 15.0, cacheRead: 0.3, cacheWrite5m: 3.75, cacheWrite1h: 6.0 },
-    "claude-sonnet-4": { input: 3.0, output: 15.0, cacheRead: 0.3, cacheWrite5m: 3.75, cacheWrite1h: 6.0 },
-    "claude-sonnet-3-7": { input: 3.0, output: 15.0, cacheRead: 0.3, cacheWrite5m: 3.75, cacheWrite1h: 6.0 },
-    "claude-haiku-4-5": { input: 1.0, output: 5.0, cacheRead: 0.1, cacheWrite5m: 1.25, cacheWrite1h: 2.0 },
-    "claude-haiku-3-5": { input: 0.8, output: 4.0, cacheRead: 0.08, cacheWrite5m: 1.0, cacheWrite1h: 1.6 },
-    "claude-haiku-3": { input: 0.25, output: 1.25, cacheRead: 0.03, cacheWrite5m: 0.3, cacheWrite1h: 0.5 },
-    "claude-opus-4-7": { input: 5.0, output: 25.0, cacheRead: 0.5, cacheWrite5m: 6.25, cacheWrite1h: 10.0 },
-    "claude-opus-4-6": { input: 5.0, output: 25.0, cacheRead: 0.5, cacheWrite5m: 6.25, cacheWrite1h: 10.0 },
-    "claude-opus-4-5": { input: 5.0, output: 25.0, cacheRead: 0.5, cacheWrite5m: 6.25, cacheWrite1h: 10.0 },
-    "claude-opus-4-1": { input: 15.0, output: 75.0, cacheRead: 1.5, cacheWrite5m: 18.75, cacheWrite1h: 30.0 },
-    "claude-opus-4": { input: 15.0, output: 75.0, cacheRead: 1.5, cacheWrite5m: 18.75, cacheWrite1h: 30.0 },
+  const rates: Record<string, { input: number; output: number; cacheRead: number; cacheWrite: number }> = {
+    "claude-sonnet-4-6": { input: 3.0, output: 15.0, cacheRead: 0.3, cacheWrite: 3.75 },
+    "claude-sonnet-4-5": { input: 3.0, output: 15.0, cacheRead: 0.3, cacheWrite: 3.75 },
+    "claude-sonnet-4": { input: 3.0, output: 15.0, cacheRead: 0.3, cacheWrite: 3.75 },
+    "claude-sonnet-3-7": { input: 3.0, output: 15.0, cacheRead: 0.3, cacheWrite: 3.75 },
+    "claude-haiku-4-5": { input: 1.0, output: 5.0, cacheRead: 0.1, cacheWrite: 1.25 },
+    "claude-haiku-3-5": { input: 0.8, output: 4.0, cacheRead: 0.08, cacheWrite: 1.0 },
+    "claude-haiku-3": { input: 0.25, output: 1.25, cacheRead: 0.03, cacheWrite: 0.3 },
+    "claude-opus-4-7": { input: 5.0, output: 25.0, cacheRead: 0.5, cacheWrite: 6.25 },
+    "claude-opus-4-6": { input: 5.0, output: 25.0, cacheRead: 0.5, cacheWrite: 6.25 },
+    "claude-opus-4-5": { input: 5.0, output: 25.0, cacheRead: 0.5, cacheWrite: 6.25 },
+    "claude-opus-4-1": { input: 15.0, output: 75.0, cacheRead: 1.5, cacheWrite: 18.75 },
+    "claude-opus-4": { input: 15.0, output: 75.0, cacheRead: 1.5, cacheWrite: 18.75 },
   }
   return rates[model] ?? rates["claude-sonnet-4-6"]!
 }
@@ -203,8 +202,7 @@ function PerStepTable({
               <th className="px-2 py-1.5 text-right font-medium text-text-muted">Input</th>
               <th className="px-2 py-1.5 text-right font-medium text-text-muted">Output</th>
               <th className="px-2 py-1.5 text-right font-medium text-text-muted">CR</th>
-              <th className="px-2 py-1.5 text-right font-medium text-text-muted">CW5m</th>
-              <th className="px-2 py-1.5 text-right font-medium text-text-muted">CW1h</th>
+              <th className="px-2 py-1.5 text-right font-medium text-text-muted">CW</th>
               <th className="px-2 py-1.5 text-right font-medium text-text-muted">Total</th>
               <th className="px-2 py-1.5 text-right font-medium text-text-muted">Cumul.</th>
             </tr>
@@ -236,10 +234,7 @@ function PerStepTable({
                     {formatCost(step.cacheReadCost)}
                   </td>
                   <td className="px-2 py-1.5 text-right text-text-secondary">
-                    {formatCost(step.cacheCreation5mCost)}
-                  </td>
-                  <td className="px-2 py-1.5 text-right text-text-secondary">
-                    {formatCost(step.cacheCreation1hCost)}
+                    {formatCost(step.cacheWriteCost)}
                   </td>
                   <td className="px-2 py-1.5 text-right font-semibold text-emerald-500">
                     {formatCost(step.totalCost)}
@@ -426,9 +421,9 @@ export function CostBreakdown({ pricing, turns, className }: CostBreakdownProps)
                 color="bg-amber-500"
               />
               <CostRow
-                label="Cache Write (5m)"
-                amount={(activeModelBreakdown.cacheCreationTokens / 1_000_000) * (activeModelRate?.cacheWrite5m ?? 3.75)}
-                percentage={activeModelBreakdown.cost > 0 ? ((activeModelBreakdown.cacheCreationTokens / 1_000_000 * (activeModelRate?.cacheWrite5m ?? 3.75)) / activeModelBreakdown.cost) * 100 : 0}
+                label="Cache Write"
+                amount={(activeModelBreakdown.cacheCreationTokens / 1_000_000) * (activeModelRate?.cacheWrite ?? 3.75)}
+                percentage={activeModelBreakdown.cost > 0 ? ((activeModelBreakdown.cacheCreationTokens / 1_000_000 * (activeModelRate?.cacheWrite ?? 3.75)) / activeModelBreakdown.cost) * 100 : 0}
                 color="bg-violet-500"
               />
             </div>
@@ -443,8 +438,7 @@ export function CostBreakdown({ pricing, turns, className }: CostBreakdownProps)
                   <PricingRateRow label="Input" rate={activeModelRate.input} />
                   <PricingRateRow label="Output" rate={activeModelRate.output} />
                   <PricingRateRow label="Cache Read" rate={activeModelRate.cacheRead} />
-                  <PricingRateRow label="Cache Write (5m)" rate={activeModelRate.cacheWrite5m} />
-                  <PricingRateRow label="Cache Write (1h)" rate={activeModelRate.cacheWrite1h} />
+                  <PricingRateRow label="Cache Write" rate={activeModelRate.cacheWrite} />
                 </div>
               </div>
             )}

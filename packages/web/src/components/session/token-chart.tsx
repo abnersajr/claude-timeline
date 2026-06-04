@@ -18,8 +18,7 @@ type TokenKey =
   | "inputTokens"
   | "outputTokens"
   | "cacheReadTokens"
-  | "cacheCreation5mTokens"
-  | "cacheCreation1hTokens"
+  | "cacheWriteTokens"
 
 interface TokenSegment {
   key: TokenKey
@@ -36,8 +35,7 @@ const SEGMENTS: TokenSegment[] = [
   { key: "inputTokens", label: "Input", color: "bg-blue-500" },
   { key: "outputTokens", label: "Output", color: "bg-emerald-500" },
   { key: "cacheReadTokens", label: "Cache Read", color: "bg-amber-500" },
-  { key: "cacheCreation5mTokens", label: "Cache Write (5m)", color: "bg-violet-500" },
-  { key: "cacheCreation1hTokens", label: "Cache Write (1h)", color: "bg-pink-500" },
+  { key: "cacheWriteTokens", label: "Cache Write", color: "bg-violet-500" },
 ]
 
 const BAR_WIDTH = 20
@@ -50,7 +48,7 @@ const LABEL_HEIGHT = 20
 // Helpers
 // ---------------------------------------------------------------------------
 
-function segmentTotal(usage: { inputTokens: number; outputTokens: number; cacheReadTokens: number; cacheCreation5mTokens: number; cacheCreation1hTokens: number }, key: TokenKey): number {
+function segmentTotal(usage: { inputTokens: number; outputTokens: number; cacheReadTokens: number; cacheWriteTokens: number }, key: TokenKey): number {
   return usage[key] ?? 0
 }
 

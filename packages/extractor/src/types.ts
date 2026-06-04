@@ -151,8 +151,13 @@ export interface PricingRate {
   inputPerMTok: number
   outputPerMTok: number
   cacheReadPerMTok: number
-  cacheCreation5mPerMTok: number
-  cacheCreation1hPerMTok: number
+  cacheWritePerMTok: number  // replaces cacheCreation5mPerMTok + cacheCreation1hPerMTok
+}
+
+/** Cached pricing file structure */
+export interface PricingFile {
+  fetchedAt: string  // ISO 8601 timestamp
+  models: Record<string, PricingRate>
 }
 
 /** Per-turn cost breakdown */
@@ -160,8 +165,7 @@ export interface TurnPricing {
   inputCost: number
   outputCost: number
   cacheReadCost: number
-  cacheCreation5mCost: number
-  cacheCreation1hCost: number
+  cacheWriteCost: number  // replaces cacheCreation5mCost + cacheCreation1hCost
   totalCost: number
 }
 

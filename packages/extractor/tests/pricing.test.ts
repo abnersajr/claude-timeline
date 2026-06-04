@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest"
+import { describe, expect, test, vi } from "vitest"
 import { calculateSessionCost, getPricing } from "../src/pricing.js"
 import type { SessionMetadata, Turn } from "../src/types.js"
 
@@ -9,8 +9,7 @@ describe("getPricing", () => {
     expect(rate.inputPerMTok).toBe(3.0)
     expect(rate.outputPerMTok).toBe(15.0)
     expect(rate.cacheReadPerMTok).toBe(0.3)
-    expect(rate.cacheCreation5mPerMTok).toBe(3.75)
-    expect(rate.cacheCreation1hPerMTok).toBe(6.0)
+    expect(rate.cacheWritePerMTok).toBe(3.75)
   })
 
   test("returns correct rates for claude-sonnet-4", () => {
@@ -25,8 +24,7 @@ describe("getPricing", () => {
     expect(rate.inputPerMTok).toBe(15.0)
     expect(rate.outputPerMTok).toBe(75.0)
     expect(rate.cacheReadPerMTok).toBe(1.5)
-    expect(rate.cacheCreation5mPerMTok).toBe(18.75)
-    expect(rate.cacheCreation1hPerMTok).toBe(30.0)
+    expect(rate.cacheWritePerMTok).toBe(18.75)
   })
 
   test("falls back to sonnet-4-6 rates for unknown model", () => {
@@ -125,22 +123,18 @@ describe("calculateSessionCost", () => {
     expect(result.totalCost).toBe(0)
   })
 
-  test("per-turn cost breakdown matches manual calculation", () => {
+  test("per-turn cost breakdown uses cacheWriteCost", () => {
     const result = calculateSessionCost(mockSession, mockTurns)
     expect(result.turnsPricing).toHaveLength(2)
 
-    // Turn 1: input=2, output=323, cacheRead=12143, cacheCreation5m=12973
+    // Turn 1: input=2, output=323, cacheRead=12143, cacheWrite=12973
     const turn1 = result.turnsPricing[0]
     expect(turn1.inputCost).toBeCloseTo((2 / 1_000_000) * 3.0)
     expect(turn1.outputCost).toBeCloseTo((323 / 1_000_000) * 15.0)
     expect(turn1.cacheReadCost).toBeCloseTo((12143 / 1_000_000) * 0.3)
-    expect(turn1.cacheCreation5mCost).toBeCloseTo((12973 / 1_000_000) * 3.75)
+    expect(turn1.cacheWriteCost).toBeCloseTo((12973 / 1_000_000) * 3.75)
     expect(turn1.totalCost).toBeCloseTo(
-      turn1.inputCost +
-        turn1.outputCost +
-        turn1.cacheReadCost +
-        turn1.cacheCreation5mCost +
-        turn1.cacheCreation1hCost,
+      turn1.inputCost + turn1.outputCost + turn1.cacheReadCost + turn1.cacheWriteCost,
     )
   })
 
