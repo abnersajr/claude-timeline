@@ -48,6 +48,17 @@ Claude Code stores rich session data in local SQLite and JSONL files, but there'
 - ⚡ **CLI tool** — extract session data from the command line
 - 📦 **Library** — import individual modules for custom integrations
 
+## Screenshots
+
+| Sessions | Session Detail |
+|:--------:|:--------------:|
+| ![Sessions](docs/screenshots/sessions-list-1.png) | ![Session Detail](docs/screenshots/session-detail-1.png) |
+| ![Sessions](docs/screenshots/sessions-list-2.png) | ![Session Detail](docs/screenshots/session-detail-2.png) |
+
+| Settings | |
+|:--------:|:-:|
+| ![Settings](docs/screenshots/settings-1.png) | ![Settings](docs/screenshots/settings-2.png) |
+
 ## Quick Start
 
 ### Web UI (recommended)
