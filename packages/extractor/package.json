@@ -1,7 +1,7 @@
 {
   "name": "claude-timeline-extractor",
   "version": "1.0.0",
-  "description": "Extract and visualize Claude Code session timelines \u2014 conversations, tool calls, pricing, and tokens.",
+  "description": "Extract and visualize Claude Code session timelines — conversations, tool calls, pricing, and tokens.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
