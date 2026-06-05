@@ -9,8 +9,8 @@
 
 <p align="center">
   <a href="https://github.com/abnersajr/claude-timeline/actions"><img src="https://github.com/abnersajr/claude-timeline/workflows/CI/badge.svg" alt="CI" /></a>
-  <a href="https://www.npmjs.com/package/claude-timeline"><img src="https://img.shields.io/npm/v/claude-timeline" alt="npm version" /></a>
-  <a href="https://github.com/abnersajr/claude-timeline/blob/main/LICENSE"><img src="https://img.shields.io/npm/l/claude-timeline" alt="license" /></a>
+  <a href="https://www.npmjs.com/package/@abnersajr/claude-timeline"><img src="https://img.shields.io/npm/v/@abnersajr/claude-timeline" alt="npm version" /></a>
+  <a href="https://github.com/abnersajr/claude-timeline/blob/main/LICENSE"><img src="https://img.shields.io/npm/l/@abnersajr/claude-timeline" alt="license" /></a>
   <a href="https://ko-fi.com/abnersajr"><img src="https://img.shields.io/badge/Ko--fi-Support%20the%20project-ff5e5b?logo=ko-fi&logoColor=white" alt="Ko-fi" /></a>
 </p>
 
@@ -23,13 +23,13 @@
 ## Installation
 
 ```bash
-npm install -g claude-timeline
+npm install -g @abnersajr/claude-timeline
 ```
 
 Or run directly with npx (no install needed):
 
 ```bash
-npx claude-timeline
+npx @abnersajr/claude-timeline
 ```
 
 **Requirements:** Node.js >= 22

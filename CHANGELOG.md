@@ -7,5 +7,5 @@
 - v1.0.0 — unified single-package release
 
   - Web UI, API server, CLI, and extractor bundled into one package
-  - Install with `npm install -g claude-timeline`
+  - Install with `npm install -g @abnersajr/claude-timeline`
   - Run with `claude-timeline serve`
