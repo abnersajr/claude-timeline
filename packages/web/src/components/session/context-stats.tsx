@@ -1,5 +1,5 @@
 import { useState } from "react"
-import type { ContextStats as ContextStatsType, ContextCategory } from "claude-timeline-types"
+import type { ContextStats as ContextStatsType, ContextCategory } from "@claude-timeline/types"
 import { cn, formatTokens, formatTimestamp } from "@/lib/utils"
 
 interface ContextStatsProps {

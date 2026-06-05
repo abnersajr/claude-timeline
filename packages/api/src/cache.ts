@@ -1,5 +1,5 @@
 import { statSync } from "node:fs"
-import type { FullTimelineSession } from "claude-timeline-types"
+import type { FullTimelineSession } from "@claude-timeline/types"
 
 interface CacheEntry {
   data: FullTimelineSession

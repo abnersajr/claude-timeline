@@ -3,7 +3,7 @@ import type {
   Turn,
   TurnPricing,
   SessionPricing,
-} from "claude-timeline-types"
+} from "@claude-timeline/types"
 import { cn, formatCost, formatTokens, modelTier } from "@/lib/utils"
 import { buildSessionSteps } from "@/lib/steps"
 

@@ -1,5 +1,5 @@
-import type { Turn, TurnPricing } from "claude-timeline-types"
-import type { Subagent } from "claude-timeline-types"
+import type { Turn, TurnPricing } from "@claude-timeline/types"
+import type { Subagent } from "@claude-timeline/types"
 import { cn } from "@/lib/utils"
 import { TurnCard } from "./turn-card"
 import { SubagentCard } from "./subagent-card"

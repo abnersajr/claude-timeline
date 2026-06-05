@@ -1,1 +1,1 @@
-console.log("claude-timeline-api ready")
+console.log("@claude-timeline/api ready")

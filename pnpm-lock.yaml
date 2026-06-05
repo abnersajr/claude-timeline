@@ -72,10 +72,10 @@ importers:
 
   packages/api:
     dependencies:
-      claude-timeline-extractor:
+      '@claude-timeline/extractor':
         specifier: workspace:*
         version: link:../extractor
-      claude-timeline-types:
+      '@claude-timeline/types':
         specifier: workspace:*
         version: link:../types
       cors:
@@ -164,12 +164,12 @@ importers:
 
   packages/types:
     devDependencies:
+      '@claude-timeline/extractor':
+        specifier: workspace:*
+        version: link:../extractor
       '@types/node':
         specifier: 22.10.5
         version: 22.10.5
-      claude-timeline-extractor:
-        specifier: workspace:*
-        version: link:../extractor
       typescript:
         specifier: 5.7.3
         version: 5.7.3
@@ -179,6 +179,9 @@ importers:
       '@base-ui/react':
         specifier: 1.4.1
         version: 1.4.1(@types/react@19.2.14)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
+      '@claude-timeline/types':
+        specifier: workspace:*
+        version: link:../types
       '@fontsource-variable/jetbrains-mono':
         specifier: 5.2.8
         version: 5.2.8
@@ -197,9 +200,6 @@ importers:
       class-variance-authority:
         specifier: 0.7.1
         version: 0.7.1
-      claude-timeline-types:
-        specifier: workspace:*
-        version: link:../types
       clsx:
         specifier: 2.1.1
         version: 2.1.1

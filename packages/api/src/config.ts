@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { homedir } from "node:os"
-import { getDbPath, getProjectsDir } from "claude-timeline-extractor/utils"
+import { getDbPath, getProjectsDir } from "@claude-timeline/extractor/utils"
 
 export interface Config {
   port: number

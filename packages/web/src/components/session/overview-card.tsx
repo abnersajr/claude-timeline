@@ -1,4 +1,4 @@
-import type { SessionMetadata, SessionPricing } from "claude-timeline-types"
+import type { SessionMetadata, SessionPricing } from "@claude-timeline/types"
 import { cn, formatCost, formatDate, formatDuration } from "@/lib/utils"
 
 /** Format large numbers compactly: 1234 → "1.2K", 1234567 → "1.2M", etc. */

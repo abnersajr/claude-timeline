@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { Collapsible } from "@base-ui/react/collapsible"
-import type { ToolCall } from "claude-timeline-types"
+import type { ToolCall } from "@claude-timeline/types"
 import { cn } from "@/lib/utils"
 import { CollapsibleResult } from "./collapsible-result"
 

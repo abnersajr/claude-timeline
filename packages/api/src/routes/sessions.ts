@@ -28,7 +28,7 @@ export function createSessionsRouter(config: Config, cache: SessionCache): Route
 
     try {
       const { listSessions, listJsonlSessions } = await import(
-        "claude-timeline-extractor/db-reader"
+        "@claude-timeline/extractor/db-reader"
       )
       const dbSessions = listSessions(config.dbPath, parsed.data.limit)
       const jsonlSessions = listJsonlSessions(
@@ -54,7 +54,7 @@ export function createSessionsRouter(config: Config, cache: SessionCache): Route
       if (existsSync(config.costStreamDbPath)) {
         try {
           const { CostStreamDb } = await import(
-            "claude-timeline-extractor/cost-stream-db" as string
+            "@claude-timeline/extractor/cost-stream-db" as string
           )
           costStreamDb = new CostStreamDb(config.costStreamDbPath)
         } catch (err) {
@@ -104,7 +104,7 @@ export function createSessionsRouter(config: Config, cache: SessionCache): Route
 
     try {
       const { extractFullTimeline, extractJsonlTimeline } = await import(
-        "claude-timeline-extractor/merger"
+        "@claude-timeline/extractor/merger"
       )
 
       let data
@@ -136,7 +136,7 @@ export function createSessionsRouter(config: Config, cache: SessionCache): Route
       // Enrich with cost-stream data (if available)
       try {
         const { enrichTimelineWithCostStream } = await import(
-          "claude-timeline-extractor/cost-stream-merger" as string
+          "@claude-timeline/extractor/cost-stream-merger" as string
         )
         data = enrichTimelineWithCostStream(data, config.costStreamDbPath)
       } catch (err) {
@@ -170,7 +170,7 @@ export function createSessionsRouter(config: Config, cache: SessionCache): Route
 
     try {
       const { listSessions, listJsonlSessions } = await import(
-        "claude-timeline-extractor/db-reader"
+        "@claude-timeline/extractor/db-reader"
       )
       const dbSessions = listSessions(config.dbPath, 100)
       const jsonlSessions = listJsonlSessions(config.projectsDir, config.dbPath, 100)
@@ -193,7 +193,7 @@ export function createSessionsRouter(config: Config, cache: SessionCache): Route
       if (existsSync(config.costStreamDbPath)) {
         try {
           const { CostStreamDb } = await import(
-            "claude-timeline-extractor/cost-stream-db" as string
+            "@claude-timeline/extractor/cost-stream-db" as string
           )
           costStreamDb = new CostStreamDb(config.costStreamDbPath)
         } catch (err) {
@@ -239,7 +239,7 @@ export function createSessionsRouter(config: Config, cache: SessionCache): Route
 
     try {
       const { extractFullTimeline, extractJsonlTimeline } = await import(
-        "claude-timeline-extractor/merger"
+        "@claude-timeline/extractor/merger"
       )
 
       let data
@@ -271,7 +271,7 @@ export function createSessionsRouter(config: Config, cache: SessionCache): Route
       // Enrich with cost-stream data (if available)
       try {
         const { enrichTimelineWithCostStream } = await import(
-          "claude-timeline-extractor/cost-stream-merger" as string
+          "@claude-timeline/extractor/cost-stream-merger" as string
         )
         data = enrichTimelineWithCostStream(data, config.costStreamDbPath)
       } catch (err) {

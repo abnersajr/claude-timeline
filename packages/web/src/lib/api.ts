@@ -1,4 +1,4 @@
-import type { FullTimelineSession } from "claude-timeline-types"
+import type { FullTimelineSession } from "@claude-timeline/types"
 
 export interface SessionSummary {
   sessionId: string

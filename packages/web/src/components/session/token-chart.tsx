@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react"
-import type { Turn, TurnPricing } from "claude-timeline-types"
+import type { Turn, TurnPricing } from "@claude-timeline/types"
 import { cn, formatTokens, formatCost } from "@/lib/utils"
 import { buildSessionSteps } from "@/lib/steps"
 import type { StepAggregate } from "@/lib/steps"

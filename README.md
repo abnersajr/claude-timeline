@@ -20,23 +20,69 @@
 
 ---
 
-## Why This Exists
+## Installation
 
-When a team member reported **929,057 cache read tokens** in a single Claude Code session, we had no way to understand what happened. The number sounded alarming, but turned out to be normal cumulative behavior across 28 turns costing only ~$0.28.
+```bash
+npm install -g claude-timeline
+```
 
-We built **claude-timeline** to answer questions like:
+Or run directly with npx (no install needed):
 
-- How many tokens did this session actually use?
-- Which tool calls cost the most?
-- Why does a 10-turn session cost more than expected?
-- Are subagents running in parallel?
-- What's the context window doing across turns?
+```bash
+npx claude-timeline
+```
 
-Claude Code stores rich session data in local SQLite and JSONL files, but there's no built-in way to see the full picture. claude-timeline extracts, merges, and visualizes everything.
+**Requirements:** Node.js >= 22
+
+## Usage
+
+### Web UI (recommended)
+
+Start the server and open the interactive timeline in your browser:
+
+```bash
+claude-timeline serve
+```
+
+Opens `http://localhost:5199` automatically. Use `--port` to change the port:
+
+```bash
+claude-timeline serve --port 3000
+```
+
+### CLI
+
+List recent sessions:
+
+```bash
+claude-timeline list
+```
+
+Extract a specific session to JSON:
+
+```bash
+claude-timeline extract --session-id <id>
+```
+
+### Cost Capture Setup
+
+Get real-time per-turn cost tracking by installing the statusline wrapper:
+
+```bash
+claude-timeline setup
+```
+
+This hooks into Claude Code's statusline and captures token usage, pricing, and model data to a local SQLite database. The web UI reads this data for live cost streaming.
+
+To uninstall, remove the `statusLine` key from `~/.claude/settings.json` and run:
+
+```bash
+rm -rf ~/.claude-timeline/
+```
 
 ## What is this?
 
-**claude-timeline** extracts and rebuilds full session timelines from Claude Code's local data stores. It merges SQLite (`usage.db`) and JSONL session files into a unified, structured format.
+Claude Code stores rich session data in local SQLite and JSONL files, but there's no built-in way to see the full picture. **claude-timeline** extracts, merges, and visualizes everything — conversations, tool calls, token usage, costs, and subagent activity.
 
 ### Features
 
@@ -46,66 +92,26 @@ Claude Code stores rich session data in local SQLite and JSONL files, but there'
 - 🧠 **Context analysis** — tracks context window usage, phases, and injections
 - 🎨 **Web UI** — interactive timeline visualization with dark/light themes
 - ⚡ **CLI tool** — extract session data from the command line
-- 📦 **Library** — import individual modules for custom integrations
 
-## Quick Start
+## CLI Reference
 
-### Web UI (recommended)
-
-```bash
-# One command — starts server + opens browser
-npx claude-timeline serve
-
-# Custom port
-npx claude-timeline serve --port 3000
 ```
+claude-timeline <command> [options]
 
-Then open `http://localhost:5199` in your browser.
+Commands:
+  serve [--port <port>]    Start web UI + API server (default: 5199)
+  extract --session-id <id> Extract a specific session to JSON
+  list                     List all available sessions
+  setup                    Install cost-capture statusline wrapper
+  update-pricing           Fetch latest model pricing from Anthropic
+  --help                   Show help
 
-### CLI
-
-```bash
-# List recent sessions
-npx claude-timeline --list-sessions
-
-# Extract a specific session to JSON
-npx claude-timeline --session-id <session-id>
+Options:
+  --port <port>            Server port (serve mode, default: 5199)
+  --db-path <path>         SQLite DB path (default: ~/.claude/usage.db)
+  --projects-dir <path>    Projects directory (default: ~/.claude/projects)
+  --output <path>          Write JSON to file instead of stdout
 ```
-
-### Library
-
-```bash
-npm install claude-timeline-extractor
-```
-
-```typescript
-import { extractFullTimeline } from "claude-timeline-extractor";
-
-const session = await extractFullTimeline(
-  sessionId,
-  "~/.claude/usage.db",
-  "~/.claude/projects"
-);
-
-console.log(session.turns.length, "turns");
-console.log(`Total cost: $${session.pricing.totalCost.toFixed(4)}`);
-```
-
-### Development
-
-```bash
-# Clone the repo
-git clone https://github.com/abnersajr/claude-timeline.git
-cd claude-timeline
-
-# Install dependencies
-pnpm install
-
-# Start development server
-pnpm dev
-```
-
-The web UI will be available at `http://localhost:5199`.
 
 ## Understanding Claude Code Sessions
 
@@ -167,127 +173,12 @@ This is why targeted searches (`grep "ERROR" app.log`) are cheaper than reading 
 | **Watch tool output sizes** | Use `head`, `tail`, `grep` to limit output. A 100k-token file read adds ~$0.69 in cache bloat over 28 turns. |
 | **Use `.claudeignore`** | Exclude `node_modules/`, `dist/`, `*.log` from discovery to prevent unrelated files from entering context. |
 
-## CLI Reference
-
-```
-claude-timeline <command> [options]
-
-Commands:
-  serve [--port <port>]    Start web UI + API server (default: 5199)
-  extract --session-id <id> Extract a specific session to JSON
-  list                     List all available sessions
-  setup                    Install cost-capture statusline wrapper
-  update-pricing           Fetch latest model pricing from Anthropic
-  --help                   Show help
-
-Options:
-  --port <port>            Server port (serve mode, default: 5199)
-  --db-path <path>         SQLite DB path (default: ~/.claude/usage.db)
-  --projects-dir <path>    Projects directory (default: ~/.claude/projects)
-  --output <path>          Write JSON to file instead of stdout
-```
-
-## Cost Capture Setup
-
-One of claude-timeline's key differentiators is **API-level cost estimation** — real-time, per-turn tracking of tokens, cache usage, and dollar cost pulled directly from Claude Code's statusline payload. This gives you accurate spending visibility that the built-in usage display doesn't provide.
-
-### Quick Start
-
-```bash
-npx claude-timeline setup
-```
-
-This hooks into Claude Code's statusline and starts capturing cost data automatically.
-
-### What It Does
-
-Claude Code calls a `statusLine` command after every turn, passing JSON with token usage, model info, and cost data. The setup command installs a wrapper that:
-
-1. **Intercepts** the JSON payload from every turn
-2. **Extracts** cost, token, model, duration, and context window data
-3. **Writes** snapshots to a local SQLite database (`~/.claude-timeline/cost-stream.db`)
-4. **Delegates** to your original statusline command (if you had one) — nothing breaks
-
-### What Gets Captured
-
-| Field | Description |
-|-------|-------------|
-| `total_cost_usd` | Running session cost |
-| `input_tokens` | New (non-cached) input tokens |
-| `output_tokens` | Model-generated tokens |
-| `cache_read_tokens` | Cached context read per turn |
-| `cache_creation_tokens` | One-time cache write cost |
-| `model` | Active model name |
-| `duration_ms` | Total session duration |
-| `lines_added` / `lines_removed` | Code churn |
-
-### How It Works
-
-```
-Claude Code turn completes
-  → calls statusLine command with JSON on stdin
-    → capture.js intercepts, writes to cost-stream.db
-      → runs your original statusLine (if any)
-        → stdout returned to Claude Code as usual
-```
-
-The data feeds directly into `npx claude-timeline serve` for live cost streaming in the web UI.
-
-### Uninstall
-
-```bash
-# Remove the wrapper from Claude Code settings
-# Edit ~/.claude/settings.json and remove the statusLine key
-# Then delete the cost-capture files
-rm -rf ~/.claude-timeline/
-```
-
-If you had a custom `statusLine` before setup, the original command is preserved in `~/.claude-timeline/config.json` under `originalStatusLine`.
-
-## Architecture
-
-```
-claude-timeline/
-├── extractor/          # Core library — the npm package
-│   ├── src/
-│   │   ├── index.ts          # CLI + main entry
-│   │   ├── db-reader.ts      # SQLite usage.db reader
-│   │   ├── jsonl-parser.ts   # JSONL session file parser
-│   │   ├── merger.ts         # Merge SQLite + JSONL data
-│   │   ├── pricing.ts        # Model pricing lookup
-│   │   ├── pricing-scraper.ts # Fetch pricing from Anthropic docs
-│   │   ├── classifier.ts     # Message classification
-│   │   ├── tool-extraction.ts # Tool call extraction
-│   │   ├── subagent-*.ts     # Subagent detection + resolution
-│   │   ├── context-tracker.ts # Context window analysis
-│   │   └── types.ts          # TypeScript interfaces
-│   └── bin/cli.js      # CLI entry point
-├── api/                # Express API server
-├── types/              # Shared TypeScript types
-├── web/                # React 19 + Tailwind v4 web UI
-└── docs/               # Design documents
-```
-
 ## Data Sources
 
 | Source | Location | Contents |
 |--------|----------|----------|
 | SQLite | `~/.claude/usage.db` | Sessions, turns, token counts |
 | JSONL | `~/.claude/projects/<project>/<session>.jsonl` | Full message content, tool calls, file paths |
-
-## Module Exports
-
-The package exports individual modules for tree-shaking:
-
-```typescript
-// Main entry
-import { extractFullTimeline } from "claude-timeline-extractor";
-
-// Individual modules
-import { parseJsonlFile } from "claude-timeline-extractor/jsonl-parser";
-import { readUsageDb } from "claude-timeline-extractor/db-reader";
-import { calculatePricing } from "claude-timeline-extractor/pricing";
-```
 
 ## Troubleshooting
 
@@ -325,20 +216,10 @@ cat ~/.claude/projects/YOUR_PROJECT_DIR/YOUR_SESSION_ID.jsonl | jq -r 'select(.t
 ## Development
 
 ```bash
-# Install dependencies
+git clone https://github.com/abnersajr/claude-timeline.git
+cd claude-timeline
 pnpm install
-
-# Run tests
-pnpm test
-
-# Type check
-pnpm typecheck
-
-# Lint
-pnpm lint
-
-# Build all packages
-pnpm build
+pnpm dev
 ```
 
 ## License

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import type { Turn, TurnPricing } from "claude-timeline-types"
+import type { Turn, TurnPricing } from "@claude-timeline/types"
 import { cn, formatCost, formatTimestamp, modelTier } from "@/lib/utils"
 import { TokenBadgeGroup } from "./token-badge"
 import { ToolCallList, ToolCallPills } from "./tool-call"

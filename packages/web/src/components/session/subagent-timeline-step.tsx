@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import type { Subagent, ToolCall } from "claude-timeline-types"
+import type { Subagent, ToolCall } from "@claude-timeline/types"
 import { cn, formatTokens, formatDuration, formatCost, modelTier } from "@/lib/utils"
 import { ToolCallList } from "./tool-call"
 

@@ -44,7 +44,7 @@ export function createStatusRouter(config: Config): Router {
       try {
         // Dynamic import to avoid hard dependency
         const { CostStreamDb } = await import(
-          "claude-timeline-extractor/cost-stream-db" as string
+          "@claude-timeline/extractor/cost-stream-db" as string
         )
         const db = new CostStreamDb(config.costStreamDbPath)
         sessionCount = db.getSessionIds().length

@@ -2,9 +2,9 @@ import path from "node:path"
 import { fileURLToPath } from "node:url"
 import express from "express"
 import cors from "cors"
-import { getDbPath, getProjectsDir } from "claude-timeline-extractor/utils"
-import { listSessions, listJsonlSessions } from "claude-timeline-extractor/db-reader"
-import { extractFullTimeline, extractJsonlTimeline } from "claude-timeline-extractor/merger"
+import { getDbPath, getProjectsDir } from "@claude-timeline/extractor/utils"
+import { listSessions, listJsonlSessions } from "@claude-timeline/extractor/db-reader"
+import { extractFullTimeline, extractJsonlTimeline } from "@claude-timeline/extractor/merger"
 
 interface Config {
   port: number

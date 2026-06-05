@@ -1,4 +1,4 @@
-import type { Turn, TurnPricing } from "claude-timeline-types"
+import type { Turn, TurnPricing } from "@claude-timeline/types"
 
 // ---------------------------------------------------------------------------
 // Types
