@@ -92,7 +92,8 @@ export function getSession(dbPath: string, sessionId: string): SessionMetadata {
       throw new SessionNotFoundError(sessionId)
     }
 
-    const model = row.model || getModelForSession(dbPath, sessionId)
+    const rawModel = row.model || getModelForSession(dbPath, sessionId)
+    const model = rawModel === "unknown" ? "claude-sonnet-4-6" : rawModel
 
     // Infer working directory from most common cwd in turns
     const cwdRow = db
@@ -283,7 +284,7 @@ export function listSessions(dbPath: string, limit = 20): SessionSummary[] {
     }>
 
     return rows.map((row) => {
-      const model = row.model || "claude-sonnet-4-6"
+      const model = (row.model && row.model !== "unknown") ? row.model : "claude-sonnet-4-6"
       // Build a minimal SessionMetadata + Turn[] to use the canonical cost calculator
       const session: SessionMetadata = {
         sessionId: row.session_id,

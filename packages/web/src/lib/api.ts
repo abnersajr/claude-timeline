@@ -26,7 +26,7 @@ export interface SettingsUpdate {
   costMethod: "api" | "estimated" | "auto"
 }
 
-const API_BASE = import.meta.env.VITE_API_URL ?? "https://api.claude-dash.local"
+const API_BASE = import.meta.env.VITE_API_URL ?? ""
 
 export async function fetchSessions(
   limit = 50,

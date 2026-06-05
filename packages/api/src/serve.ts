@@ -2,6 +2,8 @@ import path from "node:path"
 import { fileURLToPath } from "node:url"
 import express from "express"
 import cors from "cors"
+import { existsSync, readFileSync, mkdirSync, writeFileSync } from "node:fs"
+import { homedir } from "node:os"
 import { getDbPath, getProjectsDir } from "@claude-timeline/extractor/utils"
 import { listSessions, listJsonlSessions } from "@claude-timeline/extractor/db-reader"
 import { extractFullTimeline, extractJsonlTimeline } from "@claude-timeline/extractor/merger"
@@ -32,8 +34,81 @@ function loadConfig(): Config {
 }
 
 function mountApiRoutes(app: express.Express, config: Config): void {
+  const TIMELINE_DIR = path.join(homedir(), ".claude-timeline")
+  const CONFIG_PATH = path.join(TIMELINE_DIR, "config.json")
+  const CLAUDE_SETTINGS_PATH = path.join(homedir(), ".claude", "settings.json")
+
+  function isStatuslineInstalled(): boolean {
+    const capturePath = path.join(TIMELINE_DIR, "capture.js")
+    if (!existsSync(capturePath)) return false
+    try {
+      const settings = JSON.parse(readFileSync(CLAUDE_SETTINGS_PATH, "utf-8"))
+      const cmd = settings.statusLine?.command as string | undefined
+      return typeof cmd === "string" && cmd.includes("capture.js")
+    } catch {
+      return false
+    }
+  }
+
   app.get("/api/health", (_req, res) => {
     res.json({ status: "ok", version: "1.0.0" })
+  })
+
+  app.get("/api/status", async (_req, res) => {
+    const dbExists = existsSync(config.costStreamDbPath)
+    const statuslineActive = isStatuslineInstalled()
+    let sessionCount = 0
+
+    if (dbExists) {
+      try {
+        const { CostStreamDb } = await import(
+          "@claude-timeline/extractor/cost-stream-db" as string
+        )
+        const db = new CostStreamDb(config.costStreamDbPath)
+        sessionCount = db.getSessionIds().length
+        db.close()
+      } catch (err) {
+        console.error("[status] cost-stream-db import/query failed:", err)
+      }
+    }
+
+    res.json({
+      costCapture: {
+        installed: statuslineActive,
+        dbExists,
+        dbPath: config.costStreamDbPath,
+        sessionCount,
+      },
+      costMethod: config.costMethod,
+    })
+  })
+
+  app.put("/api/settings", (req, res) => {
+    const costMethod = req.body?.costMethod
+    if (!["api", "estimated", "auto"].includes(costMethod)) {
+      res.status(400).json({ error: "invalid_settings", message: "costMethod must be api, estimated, or auto" })
+      return
+    }
+
+    // Read existing config
+    let existingConfig: Record<string, unknown> = {}
+    try {
+      if (existsSync(CONFIG_PATH)) {
+        existingConfig = JSON.parse(readFileSync(CONFIG_PATH, "utf-8"))
+      }
+    } catch { /* first run */ }
+
+    existingConfig.costMethod = costMethod
+
+    try {
+      if (!existsSync(TIMELINE_DIR)) mkdirSync(TIMELINE_DIR, { recursive: true })
+      writeFileSync(CONFIG_PATH, JSON.stringify(existingConfig, null, 2) + "\n")
+    } catch {
+      res.status(500).json({ error: "write_failed", message: "Failed to save settings" })
+      return
+    }
+
+    res.json({ costMethod })
   })
 
   app.get("/api/sessions", async (req, res) => {

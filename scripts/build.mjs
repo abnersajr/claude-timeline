@@ -9,7 +9,7 @@
  */
 import { rolldown } from "rolldown"
 import { execSync } from "node:child_process"
-import { existsSync, readFileSync, writeFileSync, cpSync, rmSync, mkdirSync, readdirSync } from "node:fs"
+import { existsSync, readFileSync, writeFileSync, cpSync, rmSync, mkdirSync, readdirSync, chmodSync } from "node:fs"
 import { join, dirname } from "node:path"
 import { fileURLToPath } from "node:url"
 
@@ -66,6 +66,7 @@ function buildCli() {
       content = `#!/usr/bin/env node\n${content}`
       writeFileSync(cliPath, content)
     }
+    chmodSync(cliPath, 0o755)
     log("  ✅", `cli.js (${fileSizeKB(cliPath)}KB)`)
   } else {
     // tsdown may output .mjs — check and rename
@@ -77,6 +78,7 @@ function buildCli() {
       }
       writeFileSync(cliPath, content)
       rmSync(mjsPath)
+      chmodSync(cliPath, 0o755)
       log("  ✅", `cli.js (${fileSizeKB(cliPath)}KB)`)
     }
   }

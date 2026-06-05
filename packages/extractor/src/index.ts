@@ -120,13 +120,4 @@ async function main(): Promise<void> {
   outputJSON(data, config.outputPath)
 }
 
-// ── Run ────────────────────────────────────────────────────────────────
-if (
-  process.argv[1] &&
-  new URL(import.meta.url).pathname === process.argv[1]
-) {
-  main().catch((err) => {
-    console.error(err.message || err)
-    process.exit(1)
-  })
-}
+// main() is called by cli.ts — no self-executing guard needed
