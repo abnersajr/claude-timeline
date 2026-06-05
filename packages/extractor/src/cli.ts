@@ -8,6 +8,7 @@
  *   npx claude-timeline setup            → install cost-capture statusline
  */
 import { execSync } from "node:child_process"
+import { createRequire } from "node:module"
 import { existsSync, readdirSync, statSync, readFileSync, writeFileSync, copyFileSync, mkdirSync } from "node:fs"
 import * as fs from "node:fs"
 import * as path from "node:path"
@@ -391,10 +392,13 @@ async function startServer(port: number, open: boolean): Promise<void> {
 
 // ── CLI Definition ───────────────────────────────────────────────────────
 
+const require = createRequire(import.meta.url)
+const { version } = require("../package.json") as { version: string }
+
 const program = new Command()
   .name("claude-timeline")
   .description("Claude Code session visualizer — see your sessions, costs, and timeline")
-  .version("1.0.0")
+  .version(version)
 
 // Default command: serve + open browser
 program

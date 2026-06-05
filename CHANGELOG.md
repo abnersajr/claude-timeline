@@ -1,5 +1,11 @@
 # claude-timeline
 
+## 1.0.2
+
+### Patch Changes
+
+- Read CLI version dynamically from package.json instead of hardcoded string
+
 ## 1.0.1
 
 ### Patch Changes
