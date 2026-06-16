@@ -34,6 +34,8 @@ npx @abnersajr/claude-timeline
 
 **Requirements:** Node.js >= 22
 
+> **No setup required before sessions.** claude-timeline reads Claude Code's existing transcript files (`~/.claude/projects/`). Install it any time — past sessions are immediately available. Nothing needs to run in the background while you work.
+
 ## Usage
 
 ### Web UI (recommended)
