@@ -209,6 +209,7 @@ function extractSessionIdFromPath(filePath: string): string | null {
  * Returns empty array if table doesn't exist.
  */
 export function getProcessedFiles(dbPath: string): ProcessedFile[] {
+  if (!existsSync(dbPath)) return []
   let db: Database.Database
   try {
     db = new Database(dbPath, { readonly: true })
@@ -256,6 +257,7 @@ export interface SessionSummary {
  * List all sessions from the DB, ordered by most recent first.
  */
 export function listSessions(dbPath: string, limit = 20): SessionSummary[] {
+  if (!existsSync(dbPath)) return []
   let db: Database.Database
   try {
     db = new Database(dbPath, { readonly: true })

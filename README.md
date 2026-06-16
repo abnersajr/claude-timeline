@@ -184,6 +184,20 @@ This is why targeted searches (`grep "ERROR" app.log`) are cheaper than reading 
 
 ## Troubleshooting
 
+### `usage.db` not found / no sessions showing
+
+Claude Timeline reads `~/.claude/usage.db`, which is created and managed by Claude Code itself.
+If the file is missing, it means Claude Code hasn't generated it yet — this happens with older
+versions of Claude Code or on a fresh install before the first session completes.
+
+**What to do:**
+- Run at least one Claude Code session and let it finish.
+- Upgrade Claude Code to the latest version (`npm i -g @anthropic-ai/claude-code`).
+- If the file still doesn't exist, check the path: `ls -la ~/.claude/usage.db`.
+
+Claude Timeline will still show sessions found in `~/.claude/projects/` (JSONL files),
+so most data will be available even without `usage.db`.
+
 ### Find your recent sessions
 
 ```bash

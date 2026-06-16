@@ -111,6 +111,12 @@ function mountApiRoutes(app: express.Express, config: Config): void {
     res.json({ costMethod })
   })
 
+  if (!existsSync(config.dbPath)) {
+    console.warn(
+      `[warn] usage.db not found at ${config.dbPath} — Claude Code may not have run yet, or uses an older version. Falling back to JSONL files only.`,
+    )
+  }
+
   app.get("/api/sessions", async (req, res) => {
     try {
       const limit = Number(req.query.limit) || 20
