@@ -1,6 +1,6 @@
 {
   "name": "@abnersajr/claude-timeline",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Claude Code session timeline — extract, visualize, and track costs from your Claude Code sessions",
   "type": "module",
   "packageManager": "pnpm@11.0.3",
