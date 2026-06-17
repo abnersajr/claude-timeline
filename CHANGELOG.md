@@ -1,5 +1,11 @@
 # claude-timeline
 
+## 1.0.5
+
+### Patch Changes
+
+- 6f0bc0e: Add cache write type badges (5m/1h) to Token Usage, Cost Breakdown, and Turn Card headers for cost context
+
 ## 1.0.3
 
 ### Patch Changes
