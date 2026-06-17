@@ -238,6 +238,19 @@ function TurnRow({ turn, index, pricing, isFinalOutput }: { turn: Turn; index: n
         {/* Metrics */}
         <span className="shrink-0 font-mono text-sm text-muted-foreground ml-auto">{formatTokens(ctx)} ctx</span>
         <span className="shrink-0 font-mono text-sm text-muted-foreground">{formatTokens(turn.tokenUsage.outputTokens)} out</span>
+        {/* Cache type badges */}
+        {turn.tokenUsage.cacheReadTokens > 0 && (
+          <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-1.5 py-0.5 font-mono text-xs text-amber-400">
+            <span className="opacity-70">cache{turn.cacheReadType !== "unknown" ? ` ${turn.cacheReadType}` : ""}</span>
+            <span className="font-semibold">{formatTokens(turn.tokenUsage.cacheReadTokens)}</span>
+          </span>
+        )}
+        {turn.cacheCreationTokensThisTurn > 0 && (
+          <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-violet-500/15 px-1.5 py-0.5 font-mono text-xs text-violet-400">
+            <span className="opacity-70">write{turn.cacheWriteType !== "none" ? ` ${turn.cacheWriteType}` : ""}</span>
+            <span className="font-semibold">{formatTokens(turn.cacheCreationTokensThisTurn)}</span>
+          </span>
+        )}
         {pricing && pricing.totalCost > 0 && (
           <span className="shrink-0 font-mono text-sm text-emerald-500">{formatCost(pricing.totalCost)}</span>
         )}

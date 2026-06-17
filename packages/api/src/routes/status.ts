@@ -36,30 +36,12 @@ export function createStatusRouter(config: Config): Router {
 
   // GET /api/status — cost capture status + global settings
   router.get("/status", async (_req, res) => {
-    const dbExists = existsSync(config.costStreamDbPath)
     const statuslineActive = isStatuslineInstalled()
-    let sessionCount = 0
-
-    if (dbExists) {
-      try {
-        // Dynamic import to avoid hard dependency
-        const { CostStreamDb } = await import(
-          "@claude-timeline/extractor/cost-stream-db" as string
-        )
-        const db = new CostStreamDb(config.costStreamDbPath)
-        sessionCount = db.getSessionIds().length
-        db.close()
-      } catch (err) {
-        console.error("[status] cost-stream-db import/query failed:", err)
-      }
-    }
+    // DB status removed for now — usage.db is optional
 
     res.json({
       costCapture: {
         installed: statuslineActive,
-        dbExists,
-        dbPath: config.costStreamDbPath,
-        sessionCount,
       },
       costMethod: config.costMethod,
     })

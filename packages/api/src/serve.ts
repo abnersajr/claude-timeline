@@ -55,29 +55,12 @@ function mountApiRoutes(app: express.Express, config: Config): void {
   })
 
   app.get("/api/status", async (_req, res) => {
-    const dbExists = existsSync(config.costStreamDbPath)
     const statuslineActive = isStatuslineInstalled()
-    let sessionCount = 0
-
-    if (dbExists) {
-      try {
-        const { CostStreamDb } = await import(
-          "@claude-timeline/extractor/cost-stream-db" as string
-        )
-        const db = new CostStreamDb(config.costStreamDbPath)
-        sessionCount = db.getSessionIds().length
-        db.close()
-      } catch (err) {
-        console.error("[status] cost-stream-db import/query failed:", err)
-      }
-    }
+    // DB status removed for now — usage.db is optional
 
     res.json({
       costCapture: {
         installed: statuslineActive,
-        dbExists,
-        dbPath: config.costStreamDbPath,
-        sessionCount,
       },
       costMethod: config.costMethod,
     })
@@ -112,8 +95,8 @@ function mountApiRoutes(app: express.Express, config: Config): void {
   })
 
   if (!existsSync(config.dbPath)) {
-    console.warn(
-      `[warn] usage.db not found at ${config.dbPath} — Claude Code may not have run yet, or uses an older version. Falling back to JSONL files only.`,
+    console.log(
+      `[info] usage.db not found at ${config.dbPath} — using JSONL files only (this is normal if Claude Code hasn't run yet or uses an older version)`,
     )
   }
 

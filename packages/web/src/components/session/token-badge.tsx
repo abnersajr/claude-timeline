@@ -54,6 +54,8 @@ interface TokenBadgeGroupProps {
   outputTokens: number
   cacheReadTokens?: number
   cacheCreationTokens?: number
+  cacheWriteType?: "5m" | "1h" | "none"
+  cacheReadType?: "5m" | "1h" | "5m-fallback" | "unknown"
   className?: string
 }
 
@@ -62,17 +64,27 @@ export function TokenBadgeGroup({
   outputTokens,
   cacheReadTokens,
   cacheCreationTokens,
+  cacheWriteType,
+  cacheReadType,
   className,
 }: TokenBadgeGroupProps) {
+  // Derive labels from cache type when available
+  const readLabel = cacheReadType && cacheReadType !== "unknown"
+    ? `cache ${cacheReadType}`
+    : "cache"
+  const writeLabel = cacheWriteType && cacheWriteType !== "none"
+    ? `write ${cacheWriteType}`
+    : "write"
+
   return (
     <div className={cn("flex flex-wrap items-center gap-1.5", className)}>
       <TokenBadge count={inputTokens} category="input" />
       <TokenBadge count={outputTokens} category="output" />
       {cacheReadTokens != null && cacheReadTokens > 0 && (
-        <TokenBadge count={cacheReadTokens} category="cache-read" />
+        <TokenBadge count={cacheReadTokens} category="cache-read" label={readLabel} />
       )}
       {cacheCreationTokens != null && cacheCreationTokens > 0 && (
-        <TokenBadge count={cacheCreationTokens} category="cache-write" />
+        <TokenBadge count={cacheCreationTokens} category="cache-write" label={writeLabel} />
       )}
     </div>
   )

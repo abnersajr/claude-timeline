@@ -1,6 +1,6 @@
 import { buildConversationGroups } from "./conversation-groups"
 import { computeContextStats } from "./context-tracker"
-import { getSession, getTurns } from "./db-reader"
+import { getSession, getTurns, SessionNotFoundError } from "./db-reader"
 import { parseSessionJsonl } from "./jsonl-parser"
 import { classifyMessage } from "./classifier"
 import { normalizeModelName } from "./model-parser"
@@ -355,6 +355,10 @@ export async function extractFullTimeline(
 ): Promise<FullTimelineSession> {
   // 1. Get SQLite data
   const session = getSession(dbPath, sessionId)
+  if (!session) {
+    // DB doesn't exist or session not found — caller should fall back to JSONL-only
+    throw new SessionNotFoundError(sessionId)
+  }
   const turns = getTurns(dbPath, sessionId)
 
   // 2. Find and parse JSONL

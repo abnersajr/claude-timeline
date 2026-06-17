@@ -104,12 +104,13 @@ function printStartupStatus(port: number): void {
   const db = inspectPath(paths.dbPath)
   const projects = inspectPath(paths.projectsDir)
 
-  // Count sessions
+  // Count sessions — gracefully handle missing DB (return 0, no error)
   let sessionCount = 0
-  if (db.exists || projects.exists) {
+  if (projects.exists) {
     try {
-      const dbSessions = db.exists ? listSessions(paths.dbPath) : []
-      const jsonlSessions = projects.exists ? listJsonlSessions(paths.projectsDir, paths.dbPath) : []
+      // listSessions now returns [] if DB doesn't exist
+      const dbSessions = listSessions(paths.dbPath)
+      const jsonlSessions = listJsonlSessions(paths.projectsDir, paths.dbPath)
       const seen = new Set(dbSessions.map((s) => s.sessionId))
       for (const s of jsonlSessions) {
         if (!seen.has(s.sessionId)) seen.add(s.sessionId)
@@ -126,15 +127,12 @@ function printStartupStatus(port: number): void {
   console.log(`  → http://localhost:${port}`)
   console.log("")
 
-  // Status bar
-  const dbIcon = db.exists ? "✓" : "✗"
+  // Status bar — DB is optional, removed from display
   const projIcon = projects.exists ? "✓" : "✗"
   const sessionIcon = sessionCount > 0 ? "✓" : "–"
   const capIcon = isCostCaptureInstalled() ? "✓" : "✗"
 
   console.log("  ┌─ Status ─────────────────────────────────────┐")
-  console.log(`  │ ${dbIcon}  Database      ${paths.dbPath}`)
-  if (db.exists && db.detail) console.log(`  │    ${db.detail}`)
   console.log(`  │ ${projIcon}  Projects      ${paths.projectsDir}`)
   if (projects.exists && projects.detail) console.log(`  │    ${projects.detail}`)
   console.log(`  │ ${sessionIcon}  Sessions      ${sessionCount} found`)

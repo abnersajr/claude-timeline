@@ -1,19 +1,17 @@
 #!/usr/bin/env node
 /**
- * Dev script — starts the monorepo in HTTP or HTTPS mode.
+ * Dev script — starts the API server and web UI in parallel.
  *
- *   pnpm dev          → HTTP  (localhost:5199 → localhost:3099, no localias needed)
+ *   pnpm dev          → HTTP  (localhost:5199 → localhost:3099)
  *   pnpm dev --https  → HTTPS (via localias proxy, requires localias setup)
  */
-import { execFileSync } from "node:child_process"
+import { spawn } from "node:child_process"
 
 const useHttps = process.argv.includes("--https")
 
-const env = {
+const apiEnv = { ...process.env }
+const webEnv = {
   ...process.env,
-  // In HTTP mode, point the web app at the bare API port.
-  // In HTTPS mode, leave VITE_API_URL unset so the web app
-  // uses its built-in default (https://api.claude-timeline.local).
   ...(useHttps ? {} : { VITE_API_URL: "http://localhost:3099" }),
 }
 
@@ -23,8 +21,24 @@ console.log(
     : "🔓 Dev mode: HTTP (no localias needed)",
 )
 
-// turbo is on PATH via pnpm's node_modules/.bin
-execFileSync("turbo", ["dev"], {
+const api = spawn("pnpm", ["--filter", "@claude-timeline/api", "dev"], {
   stdio: "inherit",
-  env,
+  env: apiEnv,
 })
+
+const web = spawn("pnpm", ["--filter", "claude-timeline-web", "dev"], {
+  stdio: "inherit",
+  env: webEnv,
+})
+
+function cleanup() {
+  api.kill("SIGTERM")
+  web.kill("SIGTERM")
+  process.exit(0)
+}
+
+process.on("SIGINT", cleanup)
+process.on("SIGTERM", cleanup)
+
+api.on("close", cleanup)
+web.on("close", cleanup)

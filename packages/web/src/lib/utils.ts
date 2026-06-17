@@ -15,10 +15,39 @@ export function formatCost(n: number): string {
   return `$${n.toFixed(3)}`
 }
 
+/**
+ * Format milliseconds as a human-readable duration.
+ * Uses minutes and seconds (not fractional minutes).
+ * Examples: 114000 → '1m 54s', 3000 → '3s', 450000 → '7m 30s'
+ */
 export function formatDuration(ms: number): string {
-  if (ms >= 60_000) return `${(ms / 60_000).toFixed(1)}m`
-  if (ms >= 1_000) return `${(ms / 1_000).toFixed(1)}s`
-  return `${ms}ms`
+  if (ms < 1000) return `${Math.round(ms)}ms`
+
+  const seconds = Math.floor((ms % 60_000) / 1_000)
+  const totalMinutes = Math.floor(ms / 60_000)
+  const hours = Math.floor(totalMinutes / 60)
+  const minutes = totalMinutes % 60
+
+  const parts: string[] = []
+  if (hours > 0) parts.push(`${hours}h`)
+  if (minutes > 0) parts.push(`${minutes}m`)
+  if (seconds > 0) parts.push(`${seconds}s`)
+
+  return parts.length > 0 ? parts.join(' ') : '0s'
+}
+
+/**
+ * Format milliseconds as hours and minutes (no seconds).
+ * Examples: 114000 → '1h 54m', 45000 → '0m' (but shows '1m' for 60s+),
+ * 180000 → '3m', 4500000 → '1h 15m'
+ */
+export function formatDurationHm(ms: number): string {
+  const totalMinutes = Math.floor(ms / 60_000)
+  const hours = Math.floor(totalMinutes / 60)
+  const minutes = totalMinutes % 60
+  if (hours > 0) return `${hours}h ${minutes}m`
+  if (minutes > 0) return `${minutes}m`
+  return '< 1m'
 }
 
 export function formatTimestamp(ts: string): string {

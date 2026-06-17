@@ -76,6 +76,27 @@ function aggregateCosts(turnsPricing: TurnPricing[]): Record<string, number> {
   return agg
 }
 
+/** Compute unique cache write types present across all turns */
+function computeCacheWriteTypes(turns: Turn[]): Set<string> {
+  const writeTypes = new Set<string>()
+  for (const turn of turns) {
+    if (turn.cacheWriteType && turn.cacheWriteType !== "none") {
+      writeTypes.add(turn.cacheWriteType)
+    }
+  }
+  return writeTypes
+}
+
+function CacheWriteTypeBadge({ types }: { types: Set<string> }) {
+  if (types.size === 0) return null
+  const label = Array.from(types).join(", ")
+  return (
+    <span className="ml-1 inline-flex items-center rounded-full bg-violet-500/15 px-1.5 py-0.5 text-[0.5rem] font-medium text-violet-400">
+      {label}
+    </span>
+  )
+}
+
 function getPricingRateForModel(model: string): { input: number; output: number; cacheRead: number; cacheWrite: number } {
   // Map normalized model names to pricing rates
   const rates: Record<string, { input: number; output: number; cacheRead: number; cacheWrite: number }> = {
@@ -99,13 +120,18 @@ function getPricingRateForModel(model: string): { input: number; output: number;
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function CostRow({ label, amount, percentage, color }: CostRowProps) {
+function CostRow({ label, amount, percentage, color, cacheWriteTypes }: CostRowProps & { cacheWriteTypes?: Set<string> }) {
   if (amount === 0) return null
 
   return (
     <div className="flex items-center gap-3">
       <span className={cn("inline-block h-2.5 w-2.5 shrink-0 rounded-sm", color)} />
-      <span className="w-28 shrink-0 text-xs text-text-muted">{label}</span>
+      <span className="w-28 shrink-0 text-xs text-text-muted flex items-center">
+        {label}
+        {cacheWriteTypes && cacheWriteTypes.size > 0 && (
+          <CacheWriteTypeBadge types={cacheWriteTypes} />
+        )}
+      </span>
       <div className="relative h-2 flex-1 overflow-hidden rounded-full bg-surface-3">
         <div
           className={cn("absolute inset-y-0 left-0 rounded-full", color)}
@@ -169,9 +195,11 @@ function ModelTab({ model, cost, totalCost, isActive, isMain, onClick }: ModelTa
 function PerStepTable({
   turns,
   turnsPricing,
+  cacheWriteTypes,
 }: {
   turns: Turn[]
   turnsPricing: TurnPricing[]
+  cacheWriteTypes: Set<string>
 }) {
   const { steps, nonZeroCostSteps } = buildSessionSteps(turns, turnsPricing)
 
@@ -202,7 +230,12 @@ function PerStepTable({
               <th className="px-2 py-1.5 text-right font-medium text-text-muted">Input</th>
               <th className="px-2 py-1.5 text-right font-medium text-text-muted">Output</th>
               <th className="px-2 py-1.5 text-right font-medium text-text-muted">CR</th>
-              <th className="px-2 py-1.5 text-right font-medium text-text-muted">CW</th>
+              <th className="px-2 py-1.5 text-right font-medium text-text-muted">
+                <span className="flex items-center justify-end gap-0.5">
+                  CW
+                  <CacheWriteTypeBadge types={cacheWriteTypes} />
+                </span>
+              </th>
               <th className="px-2 py-1.5 text-right font-medium text-text-muted">Total</th>
               <th className="px-2 py-1.5 text-right font-medium text-text-muted">Cumul.</th>
             </tr>
@@ -259,6 +292,7 @@ function PerStepTable({
 export function CostBreakdown({ pricing, turns, className }: CostBreakdownProps) {
   const { totalCost, turnsPricing, pricingRate, modelBreakdown } = pricing
   const aggregated = aggregateCosts(turnsPricing)
+  const cacheWriteTypes = computeCacheWriteTypes(turns)
 
   // Build model tabs from modelBreakdown
   const models = Object.entries(modelBreakdown).sort((a, b) => b[1].cost - a[1].cost)
@@ -357,6 +391,7 @@ export function CostBreakdown({ pricing, turns, className }: CostBreakdownProps)
             {COST_CATEGORIES.map((cat) => {
               const amount = aggregated[cat.key] ?? 0
               const pct = totalCost > 0 ? (amount / totalCost) * 100 : 0
+              const isCacheWrite = cat.key === "cacheWriteCost"
               return (
                 <CostRow
                   key={cat.key}
@@ -364,6 +399,7 @@ export function CostBreakdown({ pricing, turns, className }: CostBreakdownProps)
                   amount={amount}
                   percentage={pct}
                   color={cat.color}
+                  cacheWriteTypes={isCacheWrite ? cacheWriteTypes : undefined}
                 />
               )
             })}
@@ -425,6 +461,7 @@ export function CostBreakdown({ pricing, turns, className }: CostBreakdownProps)
                 amount={(activeModelBreakdown.cacheCreationTokens / 1_000_000) * (activeModelRate?.cacheWrite ?? 3.75)}
                 percentage={activeModelBreakdown.cost > 0 ? ((activeModelBreakdown.cacheCreationTokens / 1_000_000 * (activeModelRate?.cacheWrite ?? 3.75)) / activeModelBreakdown.cost) * 100 : 0}
                 color="bg-violet-500"
+                cacheWriteTypes={cacheWriteTypes}
               />
             </div>
 
@@ -463,7 +500,7 @@ export function CostBreakdown({ pricing, turns, className }: CostBreakdownProps)
             Per-step costs based on JSONL estimation (API provides session-level total only)
           </p>
         )}
-        <PerStepTable turns={turns} turnsPricing={turnsPricing} />
+        <PerStepTable turns={turns} turnsPricing={turnsPricing} cacheWriteTypes={cacheWriteTypes} />
       </div>
     </div>
   )

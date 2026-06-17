@@ -172,6 +172,12 @@ export function TurnCard({ turn, pricing, index, className }: TurnCardProps) {
                 {turn.model}
               </span>
             )}
+            {/* Cache write type badge (5m vs 1h affects cost) */}
+            {turn.cacheWriteType && turn.cacheWriteType !== "none" && (
+              <span className="inline-flex items-center gap-0.5 rounded-full bg-violet-500/15 px-1.5 py-0.5 text-[0.625rem] font-medium text-violet-400">
+                write {turn.cacheWriteType}
+              </span>
+            )}
           </div>
         </div>
 
@@ -238,6 +244,8 @@ export function TurnCard({ turn, pricing, index, className }: TurnCardProps) {
           outputTokens={turn.tokenUsage.outputTokens}
           cacheReadTokens={turn.tokenUsage.cacheReadTokens}
           cacheCreationTokens={turn.cacheCreationTokensThisTurn}
+          cacheWriteType={turn.cacheWriteType}
+          cacheReadType={turn.cacheReadType}
         />
         {messageCount > 0 && (
           <span className="text-[0.625rem] text-muted-foreground">

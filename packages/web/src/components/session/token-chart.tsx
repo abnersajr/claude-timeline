@@ -56,17 +56,39 @@ function buildStepAggregates(turns: Turn[], turnsPricing: TurnPricing[]): StepAg
   return buildSessionSteps(turns, turnsPricing).stepAggregates
 }
 
+/** Compute unique cache write types present across all turns */
+function computeCacheWriteTypes(turns: Turn[]): Set<string> {
+  const writeTypes = new Set<string>()
+  for (const turn of turns) {
+    if (turn.cacheWriteType && turn.cacheWriteType !== "none") {
+      writeTypes.add(turn.cacheWriteType)
+    }
+  }
+  return writeTypes
+}
+
+function CacheWriteTypeBadge({ types }: { types: Set<string> }) {
+  if (types.size === 0) return null
+  const label = Array.from(types).join(", ")
+  return (
+    <span className="ml-1 inline-flex items-center rounded-full bg-violet-500/15 px-1.5 py-0.5 text-[0.5rem] font-medium text-violet-400">
+      {label}
+    </span>
+  )
+}
+
 // ---------------------------------------------------------------------------
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function Legend() {
+function Legend({ cacheWriteTypes }: { cacheWriteTypes: Set<string> }) {
   return (
     <div className="flex flex-wrap gap-x-4 gap-y-1">
       {SEGMENTS.map((seg) => (
         <div key={seg.key} className="flex items-center gap-1.5 text-xs">
           <span className={cn("inline-block h-2.5 w-2.5 rounded-sm", seg.color)} />
           <span className="text-muted-foreground">{seg.label}</span>
+          {seg.key === "cacheWriteTokens" && <CacheWriteTypeBadge types={cacheWriteTypes} />}
         </div>
       ))}
     </div>
@@ -77,10 +99,12 @@ function StepBar({
   step,
   maxTokens,
   cumulativeCost: _cumulativeCost,
+  cacheWriteTypes,
 }: {
   step: StepAggregate
   maxTokens: number
   cumulativeCost: number
+  cacheWriteTypes: Set<string>
 }) {
   const [hovered, setHovered] = useState(false)
   const barRef = useRef<HTMLDivElement>(null)
@@ -151,6 +175,7 @@ function StepBar({
                   <span className="flex items-center gap-1.5">
                     <span className={cn("inline-block h-2 w-2 rounded-sm", seg.color)} />
                     <span className="text-muted-foreground">{seg.label}</span>
+                    {seg.key === "cacheWriteTokens" && <CacheWriteTypeBadge types={cacheWriteTypes} />}
                   </span>
                   <span className="font-medium text-muted-foreground">
                     {formatTokens(val)}
@@ -222,6 +247,7 @@ export function TokenChart({ turns, turnsPricing, className }: TokenChartProps) 
   // Build step aggregates
   const stepAggregates = buildStepAggregates(turns, turnsPricing)
   const nonZeroSteps = stepAggregates.filter((s) => s.totalTokens > 0)
+  const cacheWriteTypes = computeCacheWriteTypes(turns)
 
   if (nonZeroSteps.length === 0) {
     return (
@@ -259,7 +285,7 @@ export function TokenChart({ turns, turnsPricing, className }: TokenChartProps) 
           </span>
         </div>
         <div className="mt-2">
-          <Legend />
+          <Legend cacheWriteTypes={cacheWriteTypes} />
         </div>
       </div>
 
@@ -289,6 +315,7 @@ export function TokenChart({ turns, turnsPricing, className }: TokenChartProps) 
                 step={step}
                 maxTokens={maxTokens}
                 cumulativeCost={step.cumulativeCost}
+                cacheWriteTypes={cacheWriteTypes}
               />
             ))}
           </div>
@@ -304,7 +331,10 @@ export function TokenChart({ turns, turnsPricing, className }: TokenChartProps) 
           )
           return (
             <div key={seg.key} className="text-center">
-              <p className="text-[0.625rem] text-muted-foreground">{seg.label}</p>
+              <p className="text-[0.625rem] text-muted-foreground flex items-center justify-center gap-1">
+                {seg.label}
+                {seg.key === "cacheWriteTokens" && <CacheWriteTypeBadge types={cacheWriteTypes} />}
+              </p>
               <p className="text-xs font-semibold text-foreground">
                 {formatTokens(total)}
               </p>

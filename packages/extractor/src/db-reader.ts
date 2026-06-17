@@ -74,13 +74,15 @@ interface TurnRow {
 
 /**
  * Get session metadata from SQLite DB
+ * Returns null when DB doesn't exist or can't be opened (instead of throwing).
  */
-export function getSession(dbPath: string, sessionId: string): SessionMetadata {
+export function getSession(dbPath: string, sessionId: string): SessionMetadata | null {
+  if (!existsSync(dbPath)) return null
   let db: Database.Database
   try {
     db = new Database(dbPath, { readonly: true })
-  } catch (_err) {
-    throw new DbOpenError(`Failed to open database: ${dbPath}`)
+  } catch {
+    return null
   }
 
   try {
@@ -130,11 +132,12 @@ export function getSession(dbPath: string, sessionId: string): SessionMetadata {
  * Get all turns for a session from SQLite DB
  */
 export function getTurns(dbPath: string, sessionId: string): Turn[] {
+  if (!existsSync(dbPath)) return []
   let db: Database.Database
   try {
     db = new Database(dbPath, { readonly: true })
-  } catch (_err) {
-    throw new DbOpenError(`Failed to open database: ${dbPath}`)
+  } catch {
+    return []
   }
 
   try {
@@ -169,11 +172,12 @@ export function getTurns(dbPath: string, sessionId: string): Turn[] {
  * Falls back to 'claude-sonnet-4-6' if not found
  */
 export function getModelForSession(dbPath: string, sessionId: string): string {
+  if (!existsSync(dbPath)) return "claude-sonnet-4-6"
   let db: Database.Database
   try {
     db = new Database(dbPath, { readonly: true })
-  } catch (_err) {
-    throw new DbOpenError(`Failed to open database: ${dbPath}`)
+  } catch {
+    return "claude-sonnet-4-6"
   }
 
   try {
@@ -206,15 +210,16 @@ function extractSessionIdFromPath(filePath: string): string | null {
 
 /**
  * Get processed files from the DB.
- * Returns empty array if table doesn't exist.
+ * Returns empty array if table doesn't exist or DB can't be opened.
  */
 export function getProcessedFiles(dbPath: string): ProcessedFile[] {
   if (!existsSync(dbPath)) return []
   let db: Database.Database
   try {
     db = new Database(dbPath, { readonly: true })
-  } catch (_err) {
-    throw new DbOpenError(`Failed to open database: ${dbPath}`)
+  } catch {
+    // DB doesn't exist or can't be opened — return empty array instead of throwing
+    return []
   }
 
   try {
@@ -251,18 +256,23 @@ export interface SessionSummary {
   totalCostEstimate: number
   hasThinking: boolean
   activeDurationMs?: number
+  cacheReadTokens: number
+  cacheWriteTokens: number
+  cacheWriteType: "5m" | "1h" | "none"
 }
 
 /**
  * List all sessions from the DB, ordered by most recent first.
+ * Returns empty array if DB doesn't exist or can't be opened.
  */
 export function listSessions(dbPath: string, limit = 20): SessionSummary[] {
   if (!existsSync(dbPath)) return []
   let db: Database.Database
   try {
     db = new Database(dbPath, { readonly: true })
-  } catch (_err) {
-    throw new DbOpenError(`Failed to open database: ${dbPath}`)
+  } catch {
+    // DB doesn't exist or can't be opened — return empty array instead of throwing
+    return []
   }
 
   try {
@@ -319,6 +329,8 @@ export function listSessions(dbPath: string, limit = 20): SessionSummary[] {
       ]
       const pricing = calculateSessionCost(session, syntheticTurns)
 
+      const cacheWriteType = row.total_cache_creation > 0 ? "5m" : "none"
+
       return {
         sessionId: row.session_id,
         projectName: row.project_name,
@@ -327,6 +339,9 @@ export function listSessions(dbPath: string, limit = 20): SessionSummary[] {
         lastTimestamp: row.last_timestamp,
         totalCostEstimate: pricing.totalCost,
         hasThinking: false,
+        cacheReadTokens: row.total_cache_read,
+        cacheWriteTokens: row.total_cache_creation,
+        cacheWriteType,
       }
     })
   } finally {
@@ -498,6 +513,10 @@ function parseJsonlSummary(
       // Agent resolution is best-effort for summary
     }
 
+    const totalCacheWrite = totalCacheCreation5m + totalCacheCreation1h
+    const cacheWriteType: "5m" | "1h" | "none" =
+      totalCacheCreation5m > 0 ? "5m" : totalCacheCreation1h > 0 ? "1h" : "none"
+
     return {
       sessionId,
       projectName,
@@ -507,6 +526,9 @@ function parseJsonlSummary(
       totalCostEstimate: pricing.totalCost + agentCost,
       hasThinking,
       activeDurationMs: computeActiveDurationMs(allTimestamps),
+      cacheReadTokens: totalCacheRead,
+      cacheWriteTokens: totalCacheWrite,
+      cacheWriteType,
     }
   } catch {
     return null

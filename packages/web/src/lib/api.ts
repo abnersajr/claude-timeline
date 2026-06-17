@@ -10,6 +10,9 @@ export interface SessionSummary {
   hasThinking?: boolean
   activeDurationMs?: number
   apiTotalCost?: number | null
+  cacheReadTokens: number
+  cacheWriteTokens: number
+  cacheWriteType: "5m" | "1h" | "none"
 }
 
 export interface CostStatus {

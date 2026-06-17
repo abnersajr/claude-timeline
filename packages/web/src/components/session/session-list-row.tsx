@@ -1,5 +1,5 @@
 import type { SessionSummary } from "@/lib/api"
-import { formatCost, modelTier } from "@/lib/utils"
+import { formatCost, formatTokens, formatDurationHm, modelTier } from "@/lib/utils"
 import { Link } from "@tanstack/react-router"
 import { ChevronRight } from "lucide-react"
 
@@ -17,15 +17,6 @@ function formatTime(iso: string): string {
     minute: "2-digit",
     hour12: false,
   })
-}
-
-/** Format milliseconds as 'Xh Ym' */
-function formatDurationHm(ms: number): string {
-  const totalMinutes = Math.floor(ms / 60_000)
-  const hours = Math.floor(totalMinutes / 60)
-  const minutes = totalMinutes % 60
-  if (hours > 0) return `${hours}h ${minutes}m`
-  return `${minutes}m`
 }
 
 export function SessionListRow({ session, expanded, onToggleExpand }: SessionListRowProps) {
@@ -77,6 +68,16 @@ export function SessionListRow({ session, expanded, onToggleExpand }: SessionLis
                   THINK
                 </span>
               )}
+              {session.cacheReadTokens > 0 && (
+                <span className="inline-flex items-center rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[0.625rem] font-medium text-amber-400">
+                  CACHE {formatTokens(session.cacheReadTokens)}
+                </span>
+              )}
+              {session.cacheWriteTokens > 0 && (
+                <span className="inline-flex items-center rounded-full bg-violet-500/15 px-1.5 py-0.5 text-[0.625rem] font-medium text-violet-400">
+                  WRITE {session.cacheWriteType} {formatTokens(session.cacheWriteTokens)}
+                </span>
+              )}
             </div>
           ) : (
             <div className="flex items-center justify-end gap-1.5">
@@ -86,6 +87,16 @@ export function SessionListRow({ session, expanded, onToggleExpand }: SessionLis
               {session.hasThinking && (
                 <span className="inline-flex items-center rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[0.625rem] font-medium text-amber-400">
                   THINK
+                </span>
+              )}
+              {session.cacheReadTokens > 0 && (
+                <span className="inline-flex items-center rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[0.625rem] font-medium text-amber-400">
+                  CACHE {formatTokens(session.cacheReadTokens)}
+                </span>
+              )}
+              {session.cacheWriteTokens > 0 && (
+                <span className="inline-flex items-center rounded-full bg-violet-500/15 px-1.5 py-0.5 text-[0.625rem] font-medium text-violet-400">
+                  WRITE {session.cacheWriteType} {formatTokens(session.cacheWriteTokens)}
                 </span>
               )}
             </div>
@@ -123,6 +134,18 @@ export function SessionListRow({ session, expanded, onToggleExpand }: SessionLis
                 <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Cost</span>
                 <p className="mt-0.5 font-medium text-foreground">{formatCost(cost)}</p>
               </div>
+              {session.cacheReadTokens > 0 && (
+                <div>
+                  <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Cache Read</span>
+                  <p className="mt-0.5 font-medium text-amber-400">{formatTokens(session.cacheReadTokens)}</p>
+                </div>
+              )}
+              {session.cacheWriteTokens > 0 && (
+                <div>
+                  <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Cache Write</span>
+                  <p className="mt-0.5 font-medium text-violet-400">{session.cacheWriteType} {formatTokens(session.cacheWriteTokens)}</p>
+                </div>
+              )}
               <div>
                 <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Model</span>
                 <p className="mt-0.5">
